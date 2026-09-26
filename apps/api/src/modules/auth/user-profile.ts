@@ -13,7 +13,16 @@ export const authUserSelect = {
   lastName: true,
   status: true,
   lastLoginAt: true,
-  municipality: { select: { id: true, name: true, slug: true } },
+  municipality: {
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      logoUrl: true,
+      primaryColor: true,
+      secondaryColor: true,
+    },
+  },
   roles: {
     select: {
       role: {

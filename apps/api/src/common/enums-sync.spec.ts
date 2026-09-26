@@ -14,6 +14,7 @@ describe('shared enums stay in sync with the Prisma schema', () => {
     ['RequestSource', Shared.RequestSource, Db.RequestSource],
     ['WorkOrderMediaType', Shared.WorkOrderMediaType, Db.WorkOrderMediaType],
     ['UserStatus', Shared.UserStatus, Db.UserStatus],
+    ['RecordStatus', Shared.RecordStatus, Db.RecordStatus],
   ] as const;
 
   it.each(pairs)('%s', (_name, shared, db) => {

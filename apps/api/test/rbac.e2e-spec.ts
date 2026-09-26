@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { AuditAction, RoleCode } from '@kent360/shared-types';
+import { ALL_PERMISSIONS, AuditAction, RoleCode } from '@kent360/shared-types';
 import {
   bearer,
   cookie,
@@ -319,7 +319,7 @@ describe('RBAC, tenant isolation and audit (e2e)', () => {
 
     it('exposes the permission catalogue', async () => {
       const res = await t.http().get('/api/v1/permissions').set(as('a.admin')).expect(200);
-      expect(res.body.data).toHaveLength(24);
+      expect(res.body.data).toHaveLength(ALL_PERMISSIONS.length);
       expect(res.body.data[0]).toEqual({
         code: expect.any(String),
         name: expect.any(String),

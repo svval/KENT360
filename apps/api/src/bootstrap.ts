@@ -1,10 +1,15 @@
 import { type INestApplication, RequestMethod, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { json } from 'express';
 import helmet from 'helmet';
 import { type Env } from './config/env.validation';
 
 export const API_PREFIX = 'api/v1';
+
+/** JSON body limits: 100 kB everywhere, except the GeoJSON import (real boundary files are MBs). */
+export const DEFAULT_BODY_LIMIT = '100kb';
+export const IMPORT_BODY_LIMIT = '10mb';
 
 /**
  * HTTP pipeline shared by main.ts and the e2e test harness, so tests exercise
@@ -19,6 +24,13 @@ export function configureApp(app: INestApplication): void {
       { path: 'health/ready', method: RequestMethod.GET },
     ],
   });
+
+  // The import route parses first with the larger limit; the general parser then skips the
+  // already-parsed body. The general JSON parser must be registered here explicitly: Nest
+  // skips its own once it sees any "jsonParser" middleware, which would leave every other
+  // route without a body.
+  app.use(`/${API_PREFIX}/neighborhoods/import`, json({ limit: IMPORT_BODY_LIMIT }));
+  app.use(json({ limit: DEFAULT_BODY_LIMIT }));
 
   app.use(helmet());
   app.enableCors({

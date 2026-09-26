@@ -88,3 +88,10 @@ export const RoleCode = {
   SYSTEM_ADMIN: 'SYSTEM_ADMIN',
 } as const;
 export type RoleCode = (typeof RoleCode)[keyof typeof RoleCode];
+
+/** Lifecycle of configuration records (departments, neighbourhoods, categories). */
+export const RecordStatus = {
+  ACTIVE: 'ACTIVE',
+  INACTIVE: 'INACTIVE',
+} as const;
+export type RecordStatus = (typeof RecordStatus)[keyof typeof RecordStatus];

@@ -15,6 +15,10 @@ import { AuthModule } from './modules/auth/auth.module';
 import { AppThrottlerGuard } from './modules/auth/guards/app-throttler.guard';
 import { RolesModule } from './modules/roles/roles.module';
 import { UsersModule } from './modules/users/users.module';
+import { MunicipalityModule } from './modules/municipality/municipality.module';
+import { DepartmentsModule } from './modules/departments/departments.module';
+import { NeighborhoodsModule } from './modules/neighborhoods/neighborhoods.module';
+import { RequestCategoriesModule } from './modules/request-categories/request-categories.module';
 
 @Module({
   imports: [
@@ -89,6 +93,10 @@ import { UsersModule } from './modules/users/users.module';
     AuthModule,
     UsersModule,
     RolesModule,
+    MunicipalityModule,
+    DepartmentsModule,
+    NeighborhoodsModule,
+    RequestCategoriesModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: AppThrottlerGuard },

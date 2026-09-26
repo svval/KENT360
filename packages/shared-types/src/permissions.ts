@@ -23,8 +23,13 @@ export const Permission = {
   FIELD_TEAMS_READ: 'fieldTeams.read',
   FIELD_TEAMS_MANAGE: 'fieldTeams.manage',
 
+  MUNICIPALITY_READ: 'municipality.read',
+  MUNICIPALITY_UPDATE: 'municipality.update',
+  DEPARTMENTS_READ: 'departments.read',
   DEPARTMENTS_MANAGE: 'departments.manage',
+  CATEGORIES_READ: 'categories.read',
   CATEGORIES_MANAGE: 'categories.manage',
+  NEIGHBORHOODS_READ: 'neighborhoods.read',
   NEIGHBORHOODS_MANAGE: 'neighborhoods.manage',
 
   USERS_READ: 'users.read',
@@ -45,11 +50,20 @@ export const ALL_PERMISSIONS: readonly Permission[] = Object.values(Permission);
  * can later customise role→permission mappings without code changes.
  */
 export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, readonly Permission[]> = {
-  [RoleCode.CITIZEN]: [Permission.REQUESTS_CREATE, Permission.REQUESTS_READ_OWN],
+  // Citizens pick a category and a location when reporting (Phase 5).
+  [RoleCode.CITIZEN]: [
+    Permission.REQUESTS_CREATE,
+    Permission.REQUESTS_READ_OWN,
+    Permission.CATEGORIES_READ,
+    Permission.NEIGHBORHOODS_READ,
+  ],
   [RoleCode.FIELD_STAFF]: [
     Permission.WORK_ORDERS_READ_ASSIGNED,
     Permission.WORK_ORDERS_EXECUTE,
     Permission.WORK_ORDERS_COMPLETE,
+    Permission.DEPARTMENTS_READ,
+    Permission.CATEGORIES_READ,
+    Permission.NEIGHBORHOODS_READ,
   ],
   [RoleCode.TEAM_LEADER]: [
     Permission.REQUESTS_READ,
@@ -59,6 +73,10 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, readonly Permission[]> =
     Permission.WORK_ORDERS_COMPLETE,
     Permission.FIELD_TEAMS_READ,
     Permission.ANALYTICS_READ,
+    Permission.MUNICIPALITY_READ,
+    Permission.DEPARTMENTS_READ,
+    Permission.CATEGORIES_READ,
+    Permission.NEIGHBORHOODS_READ,
   ],
   [RoleCode.DEPARTMENT_MANAGER]: [
     Permission.REQUESTS_READ,
@@ -74,6 +92,10 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, readonly Permission[]> =
     Permission.USERS_READ,
     Permission.ANALYTICS_READ,
     Permission.REPORTS_EXPORT,
+    Permission.MUNICIPALITY_READ,
+    Permission.DEPARTMENTS_READ,
+    Permission.CATEGORIES_READ,
+    Permission.NEIGHBORHOODS_READ,
   ],
   [RoleCode.SYSTEM_ADMIN]: ALL_PERMISSIONS,
 };

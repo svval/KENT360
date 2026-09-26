@@ -234,10 +234,13 @@ model Neighborhood {
   code           String   @db.VarChar(40)
   district       String?  @db.VarChar(80)
   population     Int?
-  /// MultiPolygon, SRID 4326. Written via raw SQL (ST_GeomFromGeoJSON).
+  /// MultiPolygon, SRID 4326 (a single Polygon is stored via ST_Multi). Written via raw SQL
+  /// (ST_GeomFromGeoJSON); CHECK constraints enforce ST_IsValid, non-empty and lon/lat range.
   boundary       Unsupported("geometry(MultiPolygon, 4326)")?
   /// Representative point (label/marker placement). Maintained from boundary by trigger.
   center         Unsupported("geometry(Point, 4326)")?
+  /// Neighbourhoods are deactivated, never deleted (requests keep referencing them).
+  status         RecordStatus @default(ACTIVE)
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -383,6 +386,9 @@ model RefreshToken {
 // ═════════════════════════════════ Citizen requests ══════════════════════════
 
 /// Hierarchical category tree (parentId = null → top-level category).
+/// Two-level tree: root categories group, sub-categories route (departmentId required on
+/// sub-categories). Parent and department must belong to the same municipality – enforced
+/// by RequestCategoriesService and the request_categories_tenant_check trigger.
 model RequestCategory {
   id                String       @id @default(uuid(7)) @db.Uuid
   municipalityId    String       @map("municipality_id") @db.Uuid
@@ -394,7 +400,7 @@ model RequestCategory {
   /// Lucide icon name rendered by web/mobile clients.
   icon              String?      @db.VarChar(60)
   defaultPriority   Priority     @default(NORMAL) @map("default_priority")
-  /// Resolution SLA in minutes; inherited from the parent when null.
+  /// Resolution SLA in minutes (1 … 525600); inherited from the parent when null.
   defaultSlaMinutes Int?         @map("default_sla_minutes")
   /// Lower-cased keywords used by the rule-based (mock) classifier.
   keywords          String[]     @default([])

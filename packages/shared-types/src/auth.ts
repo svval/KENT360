@@ -9,7 +9,15 @@ export interface AuthUserProfile {
   lastName: string;
   status: UserStatus;
   departmentId: string | null;
-  municipality: { id: string; name: string; slug: string };
+  /** Includes the branding the web console applies (white-label). */
+  municipality: {
+    id: string;
+    name: string;
+    slug: string;
+    logoUrl: string | null;
+    primaryColor: string;
+    secondaryColor: string;
+  };
   roles: { code: RoleCode | string; name: string }[];
   permissions: Permission[];
   lastLoginAt: string | null;
@@ -53,6 +61,17 @@ export const AuditAction = {
   USER_ROLE_CHANGED: 'USER_ROLE_CHANGED',
   ROLE_CREATED: 'ROLE_CREATED',
   ROLE_PERMISSION_CHANGED: 'ROLE_PERMISSION_CHANGED',
+  MUNICIPALITY_UPDATED: 'MUNICIPALITY_UPDATED',
+  DEPARTMENT_CREATED: 'DEPARTMENT_CREATED',
+  DEPARTMENT_UPDATED: 'DEPARTMENT_UPDATED',
+  DEPARTMENT_STATUS_CHANGED: 'DEPARTMENT_STATUS_CHANGED',
+  NEIGHBORHOOD_CREATED: 'NEIGHBORHOOD_CREATED',
+  NEIGHBORHOOD_UPDATED: 'NEIGHBORHOOD_UPDATED',
+  NEIGHBORHOOD_STATUS_CHANGED: 'NEIGHBORHOOD_STATUS_CHANGED',
+  NEIGHBORHOODS_IMPORTED: 'NEIGHBORHOODS_IMPORTED',
+  CATEGORY_CREATED: 'CATEGORY_CREATED',
+  CATEGORY_UPDATED: 'CATEGORY_UPDATED',
+  CATEGORY_STATUS_CHANGED: 'CATEGORY_STATUS_CHANGED',
 } as const;
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];
 

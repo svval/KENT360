@@ -2,8 +2,9 @@
  * KENT360 development seed – idempotent, safe to run repeatedly (`npm run db:seed`).
  *
  * Seeds the RBAC catalogue (from @kent360/shared-types), the demo municipality and
- * the demo accounts (password: Kent360!Demo). Departments, neighbourhoods,
- * categories, requests and work orders are added in Phase 4–6.
+ * the demo accounts (password: Kent360!Demo), departments, the request category tree and
+ * DEMO neighbourhood geometries (not official boundaries – see prisma/seed-domain.ts).
+ * Requests and work orders follow in Phase 5–6.
  *
  * Never run against a production database: it refuses NODE_ENV=production.
  */
@@ -13,6 +14,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client';
 import { hashPassword } from '../src/modules/auth/domain/password-policy';
 import { seedDemoMunicipality, seedDemoUsers, seedRbac } from './seed-data';
+import { seedMunicipalityDomain } from './seed-domain';
 
 loadEnv({ path: path.resolve(__dirname, '../../../.env'), quiet: true });
 loadEnv({ quiet: true });
@@ -33,6 +35,7 @@ async function main(): Promise<void> {
   const roleIds = await seedRbac(prisma);
   const municipalityId = await seedDemoMunicipality(prisma);
   const newUsers = await seedDemoUsers(prisma, municipalityId, roleIds, hashPassword);
+  const domain = await seedMunicipalityDomain(prisma, municipalityId);
 
   const [permissions, roles, mappings, municipalities, users] = await Promise.all([
     prisma.permission.count(),
@@ -44,7 +47,9 @@ async function main(): Promise<void> {
   console.log(
     `Seed complete in ${Math.round(performance.now() - startedAt)} ms – ` +
       `${permissions} permissions, ${roles} system roles, ${mappings} role-permission links, ` +
-      `${municipalities} municipality, ${users} users (${newUsers} new)`,
+      `${municipalities} municipality, ${users} users (${newUsers} new); new domain records: ` +
+      `${domain.departments} departments, ${domain.categories} categories, ` +
+      `${domain.neighborhoods} neighbourhoods`,
   );
 }
 
