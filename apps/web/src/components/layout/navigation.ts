@@ -22,7 +22,7 @@ export interface NavItem {
   /** Page subtitle shown under the title. */
   description: string;
   icon: LucideIcon;
-  /** Required permission; items are hidden (not just disabled) without it. Wired in Phase 7. */
+  /** Required permission; items are hidden (not just disabled) without it and the page is gated. */
   permission?: Permission;
 }
 

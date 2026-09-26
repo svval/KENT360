@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 
-// TODO(phase-7): Route by session – staff → /dashboard, citizens → their request list, anonymous → /login.
+// Anonymous visitors are sent on to /login by the console guard (RequireAuth).
+// TODO(phase-8): Route citizens to their own request list instead of the console.
 export default function RootPage() {
   redirect('/dashboard');
 }

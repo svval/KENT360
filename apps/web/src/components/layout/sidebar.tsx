@@ -4,6 +4,7 @@ import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/providers/auth-provider';
 import { useBranding } from '@/providers/branding-provider';
 import { navigation } from './navigation';
 
@@ -17,6 +18,14 @@ interface SidebarProps {
 export function Sidebar({ collapsed, onToggle, mobileOpen, onNavigate }: SidebarProps) {
   const pathname = usePathname();
   const branding = useBranding();
+  const { user, hasPermission } = useAuth();
+  // Items the user may not open are hidden, not disabled (the API enforces the same rules).
+  const sections = navigation
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => !item.permission || hasPermission(item.permission)),
+    }))
+    .filter((section) => section.items.length > 0);
 
   return (
     <aside
@@ -37,12 +46,14 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onNavigate }: Sidebar
         </span>
         <div className={cn('min-w-0', collapsed && 'lg:hidden')}>
           <p className="text-[15px] leading-5 font-bold tracking-tight text-white">KENT360</p>
-          <p className="truncate text-xs text-slate-400">{branding.municipalityName}</p>
+          <p className="truncate text-xs text-slate-400">
+            {user?.municipality.name ?? branding.municipalityName}
+          </p>
         </div>
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4">
-        {navigation.map((section) => (
+        {sections.map((section) => (
           <div key={section.id} className="mb-4 last:mb-0">
             {section.label && (
               <p

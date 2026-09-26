@@ -1,12 +1,16 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Info, LoaderCircle } from 'lucide-react';
-import { useState } from 'react';
+import { CircleAlert, LoaderCircle } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ApiRequestError } from '@/lib/api-client';
+import { safeRedirectTarget } from '@/lib/auth-api';
+import { useAuth } from '@/providers/auth-provider';
 
 const loginSchema = z.object({
   email: z.email('Geçerli bir e-posta adresi girin.'),
@@ -16,17 +20,33 @@ const loginSchema = z.object({
 type LoginValues = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
-  const [notice, setNotice] = useState<string | null>(null);
+  const { status, login } = useAuth();
+  const router = useRouter();
+  const target = safeRedirectTarget(useSearchParams().get('next'));
+  const [error, setError] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
+    resetField,
     formState: { errors, isSubmitting },
   } = useForm<LoginValues>({ resolver: zodResolver(loginSchema) });
 
-  // TODO(phase-3): POST /api/v1/auth/login, keep the access token in memory and the
-  // refresh token in an httpOnly cookie, then redirect by role.
-  const onSubmit = async () => {
-    setNotice('Kimlik doğrulama servisi Phase 3 kapsamında etkinleştirilecek.');
+  // Already signed in (e.g. session restored from the refresh cookie): skip the form.
+  useEffect(() => {
+    if (status === 'authenticated') router.replace(target);
+  }, [status, router, target]);
+
+  const onSubmit = async ({ email, password }: LoginValues) => {
+    setError(null);
+    try {
+      await login(email.trim(), password);
+      router.replace(target);
+    } catch (err) {
+      resetField('password');
+      setError(
+        err instanceof ApiRequestError ? err.message : 'Giriş yapılamadı. Lütfen tekrar deneyin.',
+      );
+    }
   };
 
   return (
@@ -70,13 +90,13 @@ export function LoginForm() {
         )}
       </div>
 
-      {notice && (
+      {error && (
         <div
-          role="status"
-          className="flex gap-2 rounded-lg bg-info-soft p-3 text-[13px] text-primary"
+          role="alert"
+          className="flex gap-2 rounded-lg bg-critical-soft p-3 text-[13px] text-critical"
         >
-          <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          {notice}
+          <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          {error}
         </div>
       )}
 

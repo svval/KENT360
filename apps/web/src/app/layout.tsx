@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import { type ReactNode } from 'react';
+import { AuthProvider } from '@/providers/auth-provider';
 import { BrandingProvider } from '@/providers/branding-provider';
 import { QueryProvider } from '@/providers/query-provider';
 import './globals.css';
@@ -30,7 +31,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="tr" className={inter.variable}>
       <body>
         <QueryProvider>
-          <BrandingProvider>{children}</BrandingProvider>
+          <AuthProvider>
+            <BrandingProvider>{children}</BrandingProvider>
+          </AuthProvider>
         </QueryProvider>
       </body>
     </html>

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Building2, ClipboardCheck, MapPinned, ShieldCheck } from 'lucide-react';
+import { Suspense } from 'react';
 import { LoginForm } from './login-form';
 
 export const metadata: Metadata = { title: 'Giriş' };
@@ -61,7 +62,10 @@ export default function LoginPage() {
           </div>
           <h2 className="text-2xl font-bold tracking-tight">Hesabınıza giriş yapın</h2>
           <p className="mt-1 text-muted">Devam etmek için e-posta ve şifrenizi girin.</p>
-          <LoginForm />
+          {/* useSearchParams (return path) needs a Suspense boundary for prerendering. */}
+          <Suspense>
+            <LoginForm />
+          </Suspense>
         </div>
       </main>
     </div>

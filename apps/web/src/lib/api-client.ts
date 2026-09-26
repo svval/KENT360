@@ -1,5 +1,6 @@
 import { type ApiError } from '@kent360/shared-types';
 import { appConfig } from './config';
+import { getAccessToken, refreshSession } from './session';
 
 export class ApiRequestError extends Error {
   constructor(
@@ -17,19 +18,40 @@ function isApiError(body: unknown): body is ApiError {
   return typeof body === 'object' && body !== null && (body as ApiError).success === false;
 }
 
+export interface ApiFetchInit extends RequestInit {
+  /** Retry once after renewing an expired access token (default true). */
+  retryOnUnauthorized?: boolean;
+}
+
 /**
- * Thin fetch wrapper. Converts the API error envelope into ApiRequestError so
- * TanStack Query consumers can show the server's (Turkish) message directly.
+ * Thin fetch wrapper. Adds the in-memory access token, renews it once on 401, and
+ * converts the API error envelope into ApiRequestError so TanStack Query consumers
+ * can show the server's (Turkish) message directly.
  */
-export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+export async function apiFetch<T>(path: string, init: ApiFetchInit = {}): Promise<T> {
+  const { retryOnUnauthorized = true, ...requestInit } = init;
+  const token = getAccessToken();
+
   let response: Response;
   try {
     response = await fetch(`${appConfig.apiUrl}${path}`, {
-      ...init,
-      headers: { Accept: 'application/json', ...init?.headers },
+      ...requestInit,
+      // The refresh cookie is path-scoped to /api/v1/auth, so it only travels there.
+      credentials: path.startsWith('/api/v1/auth/') ? 'include' : 'same-origin',
+      headers: {
+        Accept: 'application/json',
+        ...(requestInit.body !== undefined && { 'Content-Type': 'application/json' }),
+        ...(token && { Authorization: `Bearer ${token}` }),
+        ...requestInit.headers,
+      },
     });
   } catch {
     throw new ApiRequestError(0, 'NETWORK_ERROR', 'Sunucuya ulaşılamıyor.');
+  }
+
+  if (response.status === 401 && token && retryOnUnauthorized) {
+    const renewed = await refreshSession();
+    if (renewed) return apiFetch<T>(path, { ...init, retryOnUnauthorized: false });
   }
 
   const body: unknown = await response.json().catch(() => null);
