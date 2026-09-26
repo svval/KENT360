@@ -311,6 +311,9 @@ model Role {
   users        UserRole[]
   permissions  RolePermission[]
 
+  // The database index is NULLS NOT DISTINCT (migration 20260926000200), so a system
+  // role code exists once. Prisma cannot express that option: if this index is ever
+  // regenerated, re-add NULLS NOT DISTINCT in the migration SQL by hand.
   @@unique([municipalityId, code])
   @@map("roles")
 }

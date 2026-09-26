@@ -126,6 +126,7 @@ Prisma şema dilinin ifade edemediği kurallar ayrı migration'dadır (`20260926
 - `comments` tam olarak bir üst kayda bağlı olmalı
 - `duplicate_matches`: kendisiyle eşleşme yok, skor `[0,1]`
 - `ai_analyses.confidence ∈ [0,1]`, medya boyutu > 0, SLA dakikası > 0
+- **Sistem rolleri tekil:** `roles (municipality_id, code)` unique index'i `NULLS NOT DISTINCT` (`20260926000200_roles_nulls_not_distinct`); aynı sistem rolü kodu (`municipality_id = NULL`) ikinci kez oluşturulamaz, belediyeye özel roller farklı belediyelerde aynı kodu kullanabilir.
 - **`audit_logs` append-only:** `UPDATE`, `DELETE`, `TRUNCATE` trigger ile reddedilir. Saklama süresi dolan kayıtların arşivlenmesi yalnızca DBA tarafından, trigger bilinçli olarak devre dışı bırakılarak yapılır.
 
 ## 8. KVKK ve Veri Minimizasyonu
