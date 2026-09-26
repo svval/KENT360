@@ -85,26 +85,30 @@ Durum: ✅ uygulandı · 🗓 planlandı (faz)
 | GET   | `/health`       | Liveness                            | ✅    |
 | GET   | `/health/ready` | PostgreSQL + PostGIS kontrolü (503) | ✅    |
 
-### Auth (Phase 3)
+### Auth (Phase 3) ✅
 
-| Metot | Yol              | İzin                                |
-| ----- | ---------------- | ----------------------------------- |
-| POST  | `/auth/login`    | public · rate limit 5/dk/IP+e-posta |
-| POST  | `/auth/refresh`  | refresh cookie · rotation           |
-| POST  | `/auth/logout`   | oturum ailesini iptal eder          |
-| GET   | `/auth/me`       | profil + roller + izinler           |
-| POST  | `/auth/register` | vatandaş kaydı · rate limit         |
+| Metot  | Yol                  | İzin                                                           |
+| ------ | -------------------- | -------------------------------------------------------------- |
+| POST   | `/auth/login`        | public · rate limit 5/dk/IP+e-posta · refresh cookie döner     |
+| POST   | `/auth/refresh`      | refresh cookie · rotation + reuse detection · 30/dk            |
+| POST   | `/auth/logout`       | refresh cookie · oturum ailesini iptal eder (audit)            |
+| POST   | `/auth/logout-all`   | oturum · kullanıcının tüm oturumları (audit)                   |
+| GET    | `/auth/me`           | oturum · profil + roller + izinler                             |
+| GET    | `/auth/sessions`     | oturum · aktif oturumlar                                       |
+| DELETE | `/auth/sessions/:id` | oturum · bir oturumu sonlandırır (audit)                       |
+| POST   | `/auth/register`     | vatandaş kaydı · rate limit — **Phase 8** (vatandaş portalı) 🗓 |
 
-### Users / Roles (Phase 3)
+### Users / Roles (Phase 3) ✅
 
-| Metot | Yol                      | İzin                   |
-| ----- | ------------------------ | ---------------------- |
-| GET   | `/users`                 | `users.read`           |
-| POST  | `/users`                 | `users.manage` (audit) |
-| PATCH | `/users/:id`             | `users.manage` (audit) |
-| PUT   | `/users/:id/roles`       | `roles.manage` (audit) |
-| GET   | `/roles`, `/permissions` | `roles.manage`         |
-| PUT   | `/roles/:id/permissions` | `roles.manage` (audit) |
+| Metot | Yol                      | İzin                                                                         |
+| ----- | ------------------------ | ---------------------------------------------------------------------------- |
+| GET   | `/users`, `/users/:id`   | `users.read` · sayfalı, `q`, `status`, `role`, `sort`                        |
+| POST  | `/users`                 | `users.manage` (audit)                                                       |
+| PATCH | `/users/:id`             | `users.manage` (audit; pasifleştirme tüm oturumları kapatır)                 |
+| PUT   | `/users/:id/roles`       | `roles.manage` (audit; kendi rolü değiştirilemez)                            |
+| GET   | `/roles`, `/permissions` | `roles.manage`                                                               |
+| POST  | `/roles`                 | `roles.manage` – belediyeye özel rol (audit)                                 |
+| PUT   | `/roles/:id/permissions` | `roles.manage` (audit) – yalnız belediye rolleri; sistem rolleri salt okunur |
 
 ### Organisation (Phase 4)
 

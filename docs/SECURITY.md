@@ -14,21 +14,24 @@ Durum: ✅ uygulandı · 🗓 planlandı (faz)
 | Denetim izi             | Kayıt silme/değiştirme              | DB trigger ile append-only                                   |
 | Altyapı                 | Secret sızıntısı                    | `.env` git dışında, loglarda redaksiyon                      |
 
-## 2. Kimlik Doğrulama (Phase 3) 🗓
+## 2. Kimlik Doğrulama (Phase 3) ✅
 
 - **Parola:** Argon2id (`argon2` paketi, OWASP önerilen parametreler: m=19 MiB, t=2, p=1). Minimum 10 karakter.
 - **Access token:** JWT, 15 dk, `sub`, `mid` (municipalityId), `roles`; imza `JWT_SECRET` (≥32 karakter, env şemasıyla zorunlu ✅).
-- **Refresh token:** 7 gün, opak rastgele değer (256 bit); DB'de yalnızca SHA-256 hash (`refresh_tokens.token_hash`).
+- **Refresh token:** 7 gün, opak rastgele değer (256 bit); DB'de yalnızca **HMAC-SHA256** hash'i (`refresh_tokens.token_hash`, anahtar: `JWT_REFRESH_SECRET`) – sızan bir tablo tek başına token doğrulamaya/üretmeye yetmez.
 - **Rotation:** Her `/auth/refresh` eski token'ı iptal eder ve aynı `family_id` ile yenisini verir.
-- **Reuse detection:** Daha önce döndürülmüş bir token tekrar gelirse **bütün aile** iptal edilir (token çalınmış kabul edilir) ve audit log yazılır.
-- **Web'de saklama:** access token yalnızca bellekte; refresh token `httpOnly; Secure; SameSite=Strict; Path=/api/v1/auth` cookie. localStorage'da token tutulmaz.
+- **Reuse detection:** Daha önce döndürülmüş bir token tekrar gelirse **bütün aile** iptal edilir (token çalınmış kabul edilir) ve audit log yazılır. Aynı token'la eşzamanlı iki refresh'ten yalnızca biri kazanır (koşullu `UPDATE … WHERE revoked_at IS NULL`); kaybeden reuse sayılır. Web istemcisi bu yüzden refresh'i sekme içinde tek promise'e, sekmeler arasında Web Locks ile sıraya sokar.
+- **Anında iptal:** Access token `sid` (oturum ailesi) taşır; `JwtAuthGuard` her istekte kullanıcının aktif olduğunu, kiracının eşleştiğini ve oturumun iptal edilmediğini DB'den kontrol eder. Logout, logout-all, oturum iptali ve kullanıcı pasifleştirme 15 dk beklemeden etkili olur; rol/izin değişiklikleri de bir sonraki istekte geçerlidir.
+- **Web'de saklama:** access token yalnızca bellekte; refresh token `httpOnly; Secure; SameSite=Strict; Path=/api/v1/auth` cookie (`Secure` production'da varsayılan, `AUTH_COOKIE_SECURE` ile değiştirilebilir). localStorage'da token tutulmaz. Sayfa yenilenince oturum `/auth/refresh` ile geri yüklenir.
 - **Mobilde saklama:** Expo SecureStore (Keychain / Keystore).
-- **Hesap kilidi:** 10 ardışık başarısız girişte 15 dk (`failed_login_count`, `locked_until`). Hata mesajı hesap varlığını ele vermez ("E-posta veya şifre hatalı.").
+- **Hesap kilidi:** 10 ardışık başarısız girişte 15 dk (`failed_login_count`, `locked_until`). Hata mesajı hesap varlığını ele vermez ("E-posta veya şifre hatalı."); bilinmeyen e-postada da sahte bir Argon2 doğrulaması yapılarak yanıt süresi eşitlenir. Kilit ve pasif hesap durumu yalnızca doğru şifreyi bilen kişiye söylenir.
 
-## 3. Yetkilendirme (RBAC + izin) 🗓
+## 3. Yetkilendirme (RBAC + izin) ✅
 
-- Roller izin kümeleridir; kontrol her zaman **izin** üzerinden yapılır (`@RequirePermissions('workOrders.assign')`), rol adı üzerinden değil. Varsayılan eşleme: `packages/shared-types/src/permissions.ts` ✅.
-- **Kiracı izolasyonu:** Her sorgu JWT'deki `municipalityId` ile kapsanır; başka belediyenin kaydı 404 döner (varlığı sızdırılmaz).
+- Roller izin kümeleridir; kontrol her zaman **izin** üzerinden yapılır (`@Permissions('workOrders.assign')`, `PermissionsGuard`), rol adı üzerinden değil. Varsayılan eşleme: `packages/shared-types/src/permissions.ts` ✅.
+- **Kiracı izolasyonu:** Servisler kiracı verisine `prisma.forTenant(municipalityId)` üzerinden erişir; bu Prisma extension'ı kiracıya ait modellerde her filtreye `municipalityId` ekler (istemcinin gönderdiği değeri ezer) ve oluşturulan kayda damgalar. Başka belediyenin kaydı 404 döner (varlığı sızdırılmaz). Sınırlar: ilişkisel (nested) sorgular ve raw SQL otomatik kapsanmaz; `Role` bilinçli olarak elle kapsanır (sistem rolleri paylaşımlı).
+- **Sistem Yöneticisi:** belediyenin kendi yöneticisidir – tüm izinler, ama yalnız kendi belediyesinde; müdürlük kısıtından muaftır (`TenantContext.departmentScoped = false`). MVP'de belediyeler arası "süper admin" yoktur.
+- **Sistem rolleri** tüm belediyelerde ortaktır ve API'den değiştirilemez; belediyeler kendi rollerini oluşturup izinlerini yönetir. Kullanıcı kendi rolünü ve durumunu değiştiremez.
 - **Satır bazlı kurallar** (servis katmanında):
   - Vatandaş yalnızca kendi taleplerini görür (`requests.readOwn`).
   - Saha personeli yalnızca kendisine/ekibine atanmış iş emirlerini görür (`workOrders.readAssigned`).
@@ -66,11 +69,13 @@ Durum: ✅ uygulandı · 🗓 planlandı (faz)
 - 5xx yanıtlarında istemciye iç hata ayrıntısı dönmez; ayrıntı yalnızca sunucu logunda.
 - Health endpoint'leri access log'a yazılmaz (gürültü).
 
-## 8. Audit Edilen İşlemler 🗓 (Phase 3+)
+## 8. Audit Edilen İşlemler (Phase 3 ✅, domain olayları Phase 5+)
 
 Başarısız login (eşik aşımı), kullanıcı oluşturma/güncelleme, rol değişikliği, rol-izin değişikliği, talep durum/müdürlük/öncelik değişikliği, iş emri atama/tamamlama/doğrulama/iptal, sistem ve belediye ayarı değişikliği, refresh token reuse tespiti.
 
-Her kayıt: aktör, işlem, varlık türü/ID, önce/sonra (beyaz listeli alanlar), IP, user-agent, zaman.
+Phase 3'te uygulananlar: `LOGIN_SUCCESS`, `LOGIN_FAILED` (bilinen hesaplar), `ACCOUNT_LOCKED`, `LOGOUT`, `LOGOUT_ALL`, `SESSION_REVOKED`, `REFRESH_TOKEN_REUSE_DETECTED`, `USER_CREATED`, `USER_UPDATED`, `USER_STATUS_CHANGED`, `USER_ROLE_CHANGED`, `ROLE_CREATED`, `ROLE_PERMISSION_CHANGED` (kodlar: `@kent360/shared-types` → `AuditAction`).
+
+Her kayıt: aktör, işlem, varlık türü/ID, önce/sonra, IP, user-agent, zaman. `AuditService` her yükü yazmadan önce merkezi olarak temizler: `password`, `*Hash`, `*token*`, `secret`, `cookie`, `authorization` anahtarları ve `Bearer …` / `$argon2…` değerleri `[REDACTED]` olur. Denetlenen değişiklik bir transaction içindeyse audit satırı da aynı transaction'da yazılır.
 
 ## 9. KVKK
 

@@ -5,7 +5,7 @@ _Akıllı Belediye Operasyon ve Kent Zekâsı Platformu_
 
 KENT360 manages the full lifecycle of a municipal service request — from a citizen's photo and map pin, through AI-assisted triage, duplicate detection and department routing, to field-crew work orders with before/after evidence — and turns that operational data into neighbourhood-level urban intelligence.
 
-> **Status:** Phase 0–1 complete (architecture, monorepo, data model, infrastructure), backend and web foundations running. See the [roadmap](docs/DEVELOPMENT_ROADMAP.md).
+> **Status:** Phases 0–3 complete (architecture, infrastructure, backend foundation, authentication / RBAC / audit); the web console has real login and route protection. Next: Phase 4 (municipality domain). See the [roadmap](docs/DEVELOPMENT_ROADMAP.md).
 
 ---
 
@@ -163,7 +163,7 @@ Saha360 is scaffolded in Phase 12 — see [`apps/mobile/README.md`](apps/mobile/
 
 ## Demo Accounts
 
-Created by the seed (Phase 4). **Development only — never run the seed against a production database.**
+Created by `npm run db:seed`. **Development only** — the seed refuses to run with `NODE_ENV=production`; never run it against a production database. Log in at http://localhost:3000/login.
 
 | Role               | Email                   | Password       |
 | ------------------ | ----------------------- | -------------- |
@@ -183,10 +183,12 @@ http://localhost:4000/api/docs (OpenAPI JSON: `/api/docs/openapi.json`). Enabled
 
 ```powershell
 npm test                              # unit tests (all workspaces)
-npm run test:e2e -w @kent360/api      # API e2e (boots the full app)
+npm run test:e2e -w @kent360/api      # API e2e (boots the full app; needs `npm run infra:up`)
 npm run typecheck
 npm run lint
 ```
+
+The e2e suites run against a separate `kent360_test` database on the same PostgreSQL server (created and migrated automatically; the development database is never touched). Fixtures use unique names per run, so the database is not wiped between runs — drop `kent360_test` by hand for a clean slate.
 
 ## Roadmap
 
@@ -194,8 +196,8 @@ npm run lint
 | ----- | ------------------------------------------------------------- | ------ |
 | 0     | Architecture, monorepo, documentation                         | ✅     |
 | 1     | Docker, PostGIS, Redis, MinIO, Prisma data model              | ✅     |
-| 2     | Backend foundation (config, errors, logging, Swagger, health) | 🟡     |
-| 3     | Authentication & RBAC                                         | ⬜     |
+| 2     | Backend foundation (config, errors, logging, Swagger, health) | ✅     |
+| 3     | Authentication, RBAC & audit                                  | ✅     |
 | 4     | Municipality domain + seed                                    | ⬜     |
 | 5     | Request management, workflow, SLA                             | ⬜     |
 | 6     | Work orders, teams, before/after                              | ⬜     |

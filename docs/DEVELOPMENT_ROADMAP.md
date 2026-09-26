@@ -4,23 +4,23 @@ Durum: ✅ tamamlandı · 🟡 kısmen · ⬜ planlandı
 
 İlke: **Önce uçtan uca MVP senaryosu kusursuz çalışır, sonra genişlik.** Her faz çalışır durumda ve testleri geçer halde bırakılır.
 
-| Faz | Kapsam                                                                     | Durum                                |
-| --- | -------------------------------------------------------------------------- | ------------------------------------ |
-| 0   | Mimari, repository, dokümantasyon, monorepo                                | ✅                                   |
-| 1   | Docker altyapısı, PostgreSQL/PostGIS, Redis, MinIO, Prisma şeması, env     | ✅ gerçek DB üzerinde doğrulandı     |
-| 2   | Backend temeli: config, validation, hata formatı, loglama, Swagger, health | 🟡 temel parçalar kuruldu            |
-| 3   | Kimlik doğrulama ve yetkilendirme                                          | ⬜                                   |
-| 4   | Belediye domain'i: belediye, müdürlük, mahalle, kategori + seed            | ⬜                                   |
-| 5   | Talep yönetimi: talepler, medya, history, workflow, SLA                    | ⬜                                   |
-| 6   | İş emirleri: ekipler, atama, workflow, önce/sonra                          | ⬜                                   |
-| 7   | Web temeli: login, layout, sidebar, topbar, tasarım sistemi                | 🟡 layout ve tasarım sistemi kuruldu |
-| 8   | Yönetim arayüzü: dashboard, talepler, talep detayı, iş emirleri            | ⬜                                   |
-| 9   | GIS: harita, kümeleme, heatmap, mahalleler                                 | ⬜                                   |
-| 10  | MahallePulse: analitik, mahalle detayı                                     | ⬜                                   |
-| 11  | AI: mock provider, sınıflandırma, öncelik, müdürlük önerisi, duplicate     | ⬜                                   |
-| 12  | Saha360 mobil                                                              | ⬜                                   |
-| 13  | Raporlar, bildirimler, audit arayüzü                                       | ⬜                                   |
-| 14  | Test, güvenlik, performans, dokümantasyon, demo cilası                     | ⬜                                   |
+| Faz | Kapsam                                                                     | Durum                                                  |
+| --- | -------------------------------------------------------------------------- | ------------------------------------------------------ |
+| 0   | Mimari, repository, dokümantasyon, monorepo                                | ✅                                                     |
+| 1   | Docker altyapısı, PostgreSQL/PostGIS, Redis, MinIO, Prisma şeması, env     | ✅ gerçek DB üzerinde doğrulandı                       |
+| 2   | Backend temeli: config, validation, hata formatı, loglama, Swagger, health | ✅                                                     |
+| 3   | Kimlik doğrulama ve yetkilendirme                                          | ✅                                                     |
+| 4   | Belediye domain'i: belediye, müdürlük, mahalle, kategori + seed            | ⬜                                                     |
+| 5   | Talep yönetimi: talepler, medya, history, workflow, SLA                    | ⬜                                                     |
+| 6   | İş emirleri: ekipler, atama, workflow, önce/sonra                          | ⬜                                                     |
+| 7   | Web temeli: login, layout, sidebar, topbar, tasarım sistemi                | 🟡 oturum ve route koruması hazır; toast sistemi eksik |
+| 8   | Yönetim arayüzü: dashboard, talepler, talep detayı, iş emirleri            | ⬜                                                     |
+| 9   | GIS: harita, kümeleme, heatmap, mahalleler                                 | ⬜                                                     |
+| 10  | MahallePulse: analitik, mahalle detayı                                     | ⬜                                                     |
+| 11  | AI: mock provider, sınıflandırma, öncelik, müdürlük önerisi, duplicate     | ⬜                                                     |
+| 12  | Saha360 mobil                                                              | ⬜                                                     |
+| 13  | Raporlar, bildirimler, audit arayüzü                                       | ⬜                                                     |
+| 14  | Test, güvenlik, performans, dokümantasyon, demo cilası                     | ⬜                                                     |
 
 ---
 
@@ -39,20 +39,24 @@ Durum: ✅ tamamlandı · 🟡 kısmen · ⬜ planlandı
 - İdempotent seed altyapısı (`npm run db:seed`): izin kataloğu, sistem rolleri, demo belediyesi
 - **Çıkış kriteri:** `npm run infra:up && npm run db:deploy` hatasız çalışır, `/health/ready` → `ok` ✅ (2026-09-26: PostGIS 3.5.2, pg_trgm 1.6, geometri/GIST/GIN, konum ve mahalle merkezi trigger'ları, CHECK kısıtları, audit append-only (UPDATE/DELETE/TRUNCATE reddi) gerçek DB'de test edildi; `prisma migrate diff` şema ile DB arasında fark bulmadı)
 
-## Phase 2 – Backend Temeli 🟡
+## Phase 2 – Backend Temeli ✅
 
 - ✅ Global prefix `/api/v1`, Swagger `/api/docs`, helmet, CORS, ValidationPipe, Throttler
 - ✅ Standart hata/başarı zarfı, structured log + redaksiyon, request-id
 - ✅ `/health`, `/health/ready`
-- ⬜ Sayfalama/sıralama DTO altyapısı, `@CurrentUser`, kiracı kapsamı yardımcıları
-- **Çıkış:** e2e health testi DB ile ve DB'siz geçer
+- ✅ Sayfalama/sıralama DTO altyapısı (`PaginationQueryDto`, `parseSort` beyaz listesi), `@CurrentUser`, `@Tenant`, `@ReqMeta`, kiracı kapsamı (`prisma.forTenant()`) – Phase 3 ile tamamlandı
+- **Çıkış:** e2e testleri ayrı `kent360_test` veritabanında geçer
 
-## Phase 3 – Auth / RBAC
+## Phase 3 – Auth / RBAC / Audit ✅
 
-- Login, refresh (rotation + reuse detection), logout, me, vatandaş kaydı
-- `JwtAuthGuard` (global, `@Public()` istisnası), `PermissionsGuard` + `@RequirePermissions()`
-- Kullanıcı ve rol yönetimi uçları, audit log servisi
-- **Testler:** parola hash/doğrulama, token rotation, reuse detection, guard'lar (unit + e2e)
+- ✅ Login (Argon2id, hesap kilidi, hesap varlığını sızdırmayan hata), refresh (rotation + reuse detection, eşzamanlı kullanım koruması), logout, logout-all, oturum listesi/iptali, me
+- ✅ `JwtAuthGuard` (global, `@Public()` istisnası; kullanıcı, durum ve oturum her istekte DB'den doğrulanır), `PermissionsGuard` + `@Permissions()`
+- ✅ Kiracı izolasyonu: `prisma.forTenant()` Prisma extension'ı (başka belediyenin kaydı → 404)
+- ✅ Kullanıcı ve rol yönetimi uçları, merkezi sanitize eden `AuditService`
+- ✅ Web: gerçek login, bellek içi access token, sessiz oturum yenileme, route koruması, izin bazlı menü, topbar kullanıcı bilgisi
+- ✅ Seed: 5 demo kullanıcı (yalnız development)
+- ✅ **Testler:** unit (parola, token, guard'lar, kilit politikası, tenant scope, sanitizer, sayfalama) + e2e (auth, rotation/reuse, logout, RBAC, tenant izolasyonu, audit)
+- ⏭ Vatandaş kaydı (`/auth/register`) Phase 8'e (vatandaş portalı) taşındı: belediye seçimi Phase 4 verisine bağlı
 
 ## Phase 4 – Belediye Domain'i
 
@@ -77,7 +81,8 @@ Durum: ✅ tamamlandı · 🟡 kısmen · ⬜ planlandı
 ## Phase 7 – Web Temeli 🟡
 
 - ✅ Tasarım token'ları, Inter, sidebar (daraltılabilir, mobil çekmece), topbar (breadcrumb, arama, API durumu, kullanıcı menüsü), sayfa iskeletleri, login ekranı
-- ⬜ Gerçek oturum yönetimi, route koruması, izin bazlı menü, toast sistemi
+- ✅ Gerçek oturum yönetimi, route koruması, izin bazlı menü (Phase 3)
+- ⬜ Toast sistemi
 
 ## Phase 8 – Yönetim Arayüzü
 
