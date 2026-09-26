@@ -21,6 +21,8 @@ interface AuthContextValue {
   user: AuthUserProfile | null;
   login: (email: string, password: string) => Promise<AuthUserProfile>;
   logout: () => Promise<void>;
+  /** Reloads /auth/me – e.g. after the municipality branding changed. */
+  refreshProfile: () => Promise<void>;
   /** UI gating only – the API enforces every permission itself. */
   hasPermission: (permission: Permission) => boolean;
 }
@@ -51,6 +53,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return session.user;
   }, []);
 
+  const refreshProfile = useCallback(async () => {
+    setUser(await authApi.fetchMe());
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await authApi.logout();
@@ -67,9 +73,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       login,
       logout,
+      refreshProfile,
       hasPermission: (permission) => permissions.has(permission),
     };
-  }, [status, user, login, logout]);
+  }, [status, user, login, logout, refreshProfile]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

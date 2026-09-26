@@ -2,6 +2,7 @@
 
 import { type ReactNode, createContext, useContext } from 'react';
 import { appConfig } from '@/lib/config';
+import { useAuth } from './auth-provider';
 
 export interface Branding {
   municipalityName: string;
@@ -26,18 +27,24 @@ function safeColor(value: string, fallback: string): string {
 const BrandingContext = createContext<Branding>(defaultBranding);
 
 /**
- * White-label entry point. Tenant colours are written to :root so every Tailwind
- * token (bg-primary, text-accent…) follows the municipality brand – including
- * content rendered in portals outside this subtree.
- * TODO(phase-4): Load branding from GET /api/v1/municipalities/current instead of defaults.
+ * White-label entry point. The signed-in user's municipality (from /auth/me) provides
+ * name, logo and colours; before login the neutral defaults apply. Tenant colours are
+ * written to :root so every Tailwind token (bg-primary, text-accent…) follows the
+ * brand – including content rendered in portals outside this subtree. Semantic colours
+ * (success/warning/critical) never change.
  */
-export function BrandingProvider({
-  branding = defaultBranding,
-  children,
-}: {
-  branding?: Branding;
-  children: ReactNode;
-}) {
+export function BrandingProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
+  const municipality = user?.municipality;
+  const branding: Branding = municipality
+    ? {
+        municipalityName: municipality.name,
+        logoUrl: municipality.logoUrl ?? undefined,
+        primaryColor: municipality.primaryColor,
+        accentColor: municipality.secondaryColor,
+      }
+    : defaultBranding;
+
   const primary = safeColor(branding.primaryColor, defaultBranding.primaryColor);
   const accent = safeColor(branding.accentColor, defaultBranding.accentColor);
 

@@ -18,7 +18,7 @@ interface SidebarProps {
 export function Sidebar({ collapsed, onToggle, mobileOpen, onNavigate }: SidebarProps) {
   const pathname = usePathname();
   const branding = useBranding();
-  const { user, hasPermission } = useAuth();
+  const { hasPermission } = useAuth();
   // Items the user may not open are hidden, not disabled (the API enforces the same rules).
   const sections = navigation
     .map((section) => ({
@@ -38,17 +38,25 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onNavigate }: Sidebar
       )}
     >
       <div className="flex h-topbar shrink-0 items-center gap-3 border-b border-white/10 px-4">
-        <span
-          aria-hidden="true"
-          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-[13px] font-bold tracking-tight text-white"
-        >
-          K
-        </span>
+        {branding.logoUrl ? (
+          // Tenant logo from an arbitrary host: a plain <img>, not next/image (no domain allow-list).
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={branding.logoUrl}
+            alt=""
+            className="size-9 shrink-0 rounded-lg bg-white object-contain p-1"
+          />
+        ) : (
+          <span
+            aria-hidden="true"
+            className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-[13px] font-bold tracking-tight text-white"
+          >
+            K
+          </span>
+        )}
         <div className={cn('min-w-0', collapsed && 'lg:hidden')}>
           <p className="text-[15px] leading-5 font-bold tracking-tight text-white">KENT360</p>
-          <p className="truncate text-xs text-slate-400">
-            {user?.municipality.name ?? branding.municipalityName}
-          </p>
+          <p className="truncate text-xs text-slate-400">{branding.municipalityName}</p>
         </div>
       </div>
 

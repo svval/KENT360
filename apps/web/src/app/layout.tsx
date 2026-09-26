@@ -4,6 +4,7 @@ import { type ReactNode } from 'react';
 import { AuthProvider } from '@/providers/auth-provider';
 import { BrandingProvider } from '@/providers/branding-provider';
 import { QueryProvider } from '@/providers/query-provider';
+import { ToastProvider } from '@/providers/toast-provider';
 import './globals.css';
 
 const inter = Inter({
@@ -32,7 +33,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         <QueryProvider>
           <AuthProvider>
-            <BrandingProvider>{children}</BrandingProvider>
+            <BrandingProvider>
+              <ToastProvider>{children}</ToastProvider>
+            </BrandingProvider>
           </AuthProvider>
         </QueryProvider>
       </body>
