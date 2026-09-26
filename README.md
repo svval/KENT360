@@ -130,11 +130,13 @@ Migrations: `20260926000000_init` (generated from the Prisma schema) and `202609
 
 ## Seed
 
-Demo seed data (municipality, departments, neighbourhood polygons, categories, users, 150+ requests, 40+ work orders) arrives in Phases 4–6:
+Idempotent development seed (`apps/api/prisma/seed.ts`, safe to re-run; refuses to run with `NODE_ENV=production`):
 
 ```powershell
-npm run db:seed         # available from Phase 4
+npm run db:seed
 ```
+
+Currently seeds the RBAC catalogue (24 permissions, 5 system roles and their default permission sets from `@kent360/shared-types`) and the demo municipality. Departments, neighbourhood polygons, categories, users, 150+ requests and 40+ work orders are added in Phases 4–6.
 
 ## Start Backend
 

@@ -4,23 +4,23 @@ Durum: ✅ tamamlandı · 🟡 kısmen · ⬜ planlandı
 
 İlke: **Önce uçtan uca MVP senaryosu kusursuz çalışır, sonra genişlik.** Her faz çalışır durumda ve testleri geçer halde bırakılır.
 
-| Faz | Kapsam                                                                     | Durum                                                          |
-| --- | -------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| 0   | Mimari, repository, dokümantasyon, monorepo                                | ✅                                                             |
-| 1   | Docker altyapısı, PostgreSQL/PostGIS, Redis, MinIO, Prisma şeması, env     | ✅ (migration'ın DB'ye uygulanması Docker kurulumunu bekliyor) |
-| 2   | Backend temeli: config, validation, hata formatı, loglama, Swagger, health | 🟡 temel parçalar kuruldu                                      |
-| 3   | Kimlik doğrulama ve yetkilendirme                                          | ⬜                                                             |
-| 4   | Belediye domain'i: belediye, müdürlük, mahalle, kategori + seed            | ⬜                                                             |
-| 5   | Talep yönetimi: talepler, medya, history, workflow, SLA                    | ⬜                                                             |
-| 6   | İş emirleri: ekipler, atama, workflow, önce/sonra                          | ⬜                                                             |
-| 7   | Web temeli: login, layout, sidebar, topbar, tasarım sistemi                | 🟡 layout ve tasarım sistemi kuruldu                           |
-| 8   | Yönetim arayüzü: dashboard, talepler, talep detayı, iş emirleri            | ⬜                                                             |
-| 9   | GIS: harita, kümeleme, heatmap, mahalleler                                 | ⬜                                                             |
-| 10  | MahallePulse: analitik, mahalle detayı                                     | ⬜                                                             |
-| 11  | AI: mock provider, sınıflandırma, öncelik, müdürlük önerisi, duplicate     | ⬜                                                             |
-| 12  | Saha360 mobil                                                              | ⬜                                                             |
-| 13  | Raporlar, bildirimler, audit arayüzü                                       | ⬜                                                             |
-| 14  | Test, güvenlik, performans, dokümantasyon, demo cilası                     | ⬜                                                             |
+| Faz | Kapsam                                                                     | Durum                                |
+| --- | -------------------------------------------------------------------------- | ------------------------------------ |
+| 0   | Mimari, repository, dokümantasyon, monorepo                                | ✅                                   |
+| 1   | Docker altyapısı, PostgreSQL/PostGIS, Redis, MinIO, Prisma şeması, env     | ✅ gerçek DB üzerinde doğrulandı     |
+| 2   | Backend temeli: config, validation, hata formatı, loglama, Swagger, health | 🟡 temel parçalar kuruldu            |
+| 3   | Kimlik doğrulama ve yetkilendirme                                          | ⬜                                   |
+| 4   | Belediye domain'i: belediye, müdürlük, mahalle, kategori + seed            | ⬜                                   |
+| 5   | Talep yönetimi: talepler, medya, history, workflow, SLA                    | ⬜                                   |
+| 6   | İş emirleri: ekipler, atama, workflow, önce/sonra                          | ⬜                                   |
+| 7   | Web temeli: login, layout, sidebar, topbar, tasarım sistemi                | 🟡 layout ve tasarım sistemi kuruldu |
+| 8   | Yönetim arayüzü: dashboard, talepler, talep detayı, iş emirleri            | ⬜                                   |
+| 9   | GIS: harita, kümeleme, heatmap, mahalleler                                 | ⬜                                   |
+| 10  | MahallePulse: analitik, mahalle detayı                                     | ⬜                                   |
+| 11  | AI: mock provider, sınıflandırma, öncelik, müdürlük önerisi, duplicate     | ⬜                                   |
+| 12  | Saha360 mobil                                                              | ⬜                                   |
+| 13  | Raporlar, bildirimler, audit arayüzü                                       | ⬜                                   |
+| 14  | Test, güvenlik, performans, dokümantasyon, demo cilası                     | ⬜                                   |
 
 ---
 
@@ -36,7 +36,8 @@ Durum: ✅ tamamlandı · 🟡 kısmen · ⬜ planlandı
 - Prisma 7 şeması: 26 model, 17 enum, PostGIS geometri kolonları, GIST/GIN index'ler
 - Migration `init` (Prisma üretimi) + `db_rules` (trigger'lar, CHECK kısıtları, append-only audit)
 - `.env.example`, Zod ile doğrulanan env şeması
-- **Çıkış kriteri:** `npm run infra:up && npm run db:deploy` hatasız çalışır, `/health/ready` → `ok`
+- İdempotent seed altyapısı (`npm run db:seed`): izin kataloğu, sistem rolleri, demo belediyesi
+- **Çıkış kriteri:** `npm run infra:up && npm run db:deploy` hatasız çalışır, `/health/ready` → `ok` ✅ (2026-09-26: PostGIS 3.5.2, pg_trgm 1.6, geometri/GIST/GIN, konum ve mahalle merkezi trigger'ları, CHECK kısıtları, audit append-only (UPDATE/DELETE/TRUNCATE reddi) gerçek DB'de test edildi; `prisma migrate diff` şema ile DB arasında fark bulmadı)
 
 ## Phase 2 – Backend Temeli 🟡
 
