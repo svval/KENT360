@@ -124,6 +124,16 @@ export interface NeighborhoodImportError {
   index: number;
   code: string | null;
   message: string;
+  /** Machine-readable cause, e.g. NEIGHBORHOOD_BOUNDARY_OVERLAP. */
+  reason?: string;
+  /** The neighbourhood this feature overlaps (never its geometry). */
+  conflict?: {
+    code: string;
+    name: string;
+    /** Already stored in the municipality, or another feature of the same file. */
+    source: 'database' | 'file';
+    overlapM2: number;
+  };
 }
 
 export interface NeighborhoodResolution {

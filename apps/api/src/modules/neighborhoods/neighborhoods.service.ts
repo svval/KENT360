@@ -26,11 +26,21 @@ import {
   validateAreaGeometry,
 } from './domain/geojson';
 import {
+  importFailureIsOverlapOnly,
+  OVERLAP_TOLERANCE_M2,
+  type OverlapConflict,
+  overlapImportError,
+  overlapMessage,
+} from './domain/overlap';
+import {
   type CreateNeighborhoodDto,
   type ImportNeighborhoodsDto,
   type ListNeighborhoodsQueryDto,
   type UpdateNeighborhoodDto,
 } from './dto/neighborhoods.dto';
+
+/** Anything that can run raw SQL: the root client or a (tenant-scoped) transaction. */
+type RawDb = Pick<PrismaService, '$queryRaw' | '$executeRaw'>;
 
 const SORTABLE = ['name', 'code', 'createdAt', 'status'] as const;
 
@@ -167,6 +177,13 @@ export class NeighborhoodsService {
     const geometry = validateAreaGeometry(dto.geometry);
     if (!geometry.ok) throw invalidGeometry(geometry.error);
     await this.assertValidInPostgis([geometry.geometry]);
+    const conflicts = await this.databaseOverlaps(
+      this.prisma,
+      actor.municipalityId,
+      [geometry.geometry],
+      [],
+    );
+    if (conflicts.length > 0) throw overlapError(conflicts);
 
     const feature: ImportFeature = {
       index: 0,
@@ -204,8 +221,32 @@ export class NeighborhoodsService {
     const changed = changedFields(before, attributes as Partial<NeighborhoodRecord>);
     if (changed.length === 0 && !geometry) return this.get(actor, id);
 
+    // Overlap matters only for a neighbourhood that is (or becomes) ACTIVE and whose area
+    // changes or re-enters the active set.
+    const willBeActive = (dto.status ?? before.status) === 'ACTIVE';
+    const reactivated = changed.includes('status') && dto.status === 'ACTIVE';
+    const candidate =
+      willBeActive && (geometry || reactivated)
+        ? (geometry ?? (await this.storedBoundary(actor, id)))
+        : null;
+    if (candidate) {
+      const conflicts = await this.databaseOverlaps(
+        this.prisma,
+        actor.municipalityId,
+        [candidate],
+        [id],
+      );
+      if (conflicts.length > 0) throw overlapError(conflicts);
+    }
+
     const db = this.prisma.forTenant(actor.municipalityId);
     await db.$transaction(async (tx) => {
+      if (candidate) {
+        // Re-check under the per-municipality lock: a concurrent write cannot slip in between.
+        await this.lockNeighborhoodWrites(tx, actor.municipalityId);
+        const late = await this.databaseOverlaps(tx, actor.municipalityId, [candidate], [id]);
+        if (late.length > 0) throw overlapError(late);
+      }
       const updated = await tx.neighborhood.update({
         where: { id },
         data: pickFields(attributes as Partial<NeighborhoodRecord>, changed),
@@ -257,7 +298,8 @@ export class NeighborhoodsService {
 
   /**
    * All-or-nothing import of a FeatureCollection. Every feature is validated first
-   * (structure, codes, duplicates in file and in the database, ST_IsValid); only a fully
+   * (structure, codes, duplicates in file and in the database, ST_IsValid, area overlap
+   * with other features of the file and with active neighbourhoods); only a fully
    * valid file is written, inside one transaction. Duplicate policy (MVP): an existing
    * code in the municipality is an error – no silent overwrite, no upsert.
    */
@@ -286,6 +328,22 @@ export class NeighborhoodsService {
             message: 'Bu kodla kayıtlı bir mahalle zaten var.',
           });
         }
+      }
+
+      // Overlaps need topologically valid geometries (ST_Intersection fails otherwise).
+      const invalid = new Set(errors.map((e) => e.index));
+      const valid = features.filter((feature) => !invalid.has(feature.index));
+      for (const { feature, conflict } of await this.fileOverlaps(valid)) {
+        errors.push(overlapImportError(conflict, feature));
+      }
+      const stored = await this.databaseOverlaps(
+        this.prisma,
+        actor.municipalityId,
+        valid.map((feature) => feature.geometry),
+        [],
+      );
+      for (const conflict of stored) {
+        errors.push(overlapImportError(conflict, valid[conflict.index]));
       }
     }
     if (errors.length > 0) {
@@ -321,6 +379,22 @@ export class NeighborhoodsService {
     const db = this.prisma.forTenant(actor.municipalityId);
     return db.$transaction(
       async (tx) => {
+        await this.lockNeighborhoodWrites(tx, actor.municipalityId);
+        const late = await this.databaseOverlaps(
+          tx,
+          actor.municipalityId,
+          features.map((feature) => feature.geometry),
+          [],
+        );
+        if (late.length > 0) {
+          throw isImport
+            ? importFailed(
+                new Set(late.map((conflict) => conflict.index)).size,
+                late.map((conflict) => overlapImportError(conflict, features[conflict.index])),
+              )
+            : overlapError(late);
+        }
+
         const rows = await tx.neighborhood.createManyAndReturn({
           data: features.map((f) => ({
             municipalityId: actor.municipalityId,
@@ -374,6 +448,97 @@ export class NeighborhoodsService {
       },
       { timeout: 60_000 },
     );
+  }
+
+  /**
+   * ACTIVE neighbourhoods of the municipality (except `excludeIds`) whose boundary shares
+   * more than OVERLAP_TOLERANCE_M2 of area with one of the candidates. ST_Intersects is
+   * only the index-backed pre-filter; touching along a common border yields area 0 and
+   * is accepted. Candidates must already have passed ST_IsValid.
+   */
+  private async databaseOverlaps(
+    db: RawDb,
+    municipalityId: string,
+    geometries: AreaGeometry[],
+    excludeIds: string[],
+  ): Promise<OverlapConflict[]> {
+    if (geometries.length === 0) return [];
+    const payload = JSON.stringify(geometries);
+    const rows = await db.$queryRaw<{ ord: number; code: string; name: string; area: number }[]>`
+      WITH c AS (
+        SELECT (f.ordinality - 1)::int AS ord,
+               ST_Multi(ST_Force2D(ST_SetSRID(ST_GeomFromGeoJSON(f.value), 4326))) AS g
+        FROM jsonb_array_elements(${payload}::jsonb) WITH ORDINALITY AS f(value, ordinality)
+      )
+      SELECT c.ord, n.code, n.name, x.area
+      FROM c
+      JOIN neighborhoods n
+        ON n.municipality_id = ${municipalityId}::uuid
+       AND n.status = 'ACTIVE' AND n.boundary IS NOT NULL
+       AND NOT (n.id = ANY(${excludeIds}::uuid[]))
+       AND ST_Intersects(n.boundary, c.g)
+      CROSS JOIN LATERAL (
+        SELECT ST_Area(ST_Intersection(n.boundary, c.g)::geography)::float8 AS area
+      ) AS x
+      WHERE x.area > ${OVERLAP_TOLERANCE_M2}::float8
+      ORDER BY c.ord, x.area DESC`;
+    return rows.map((row) => ({
+      index: row.ord,
+      code: row.code,
+      name: row.name,
+      source: 'database',
+      overlapM2: row.area,
+    }));
+  }
+
+  /** Pairs of features in one import file that overlap each other (reported on the later one). */
+  private async fileOverlaps(
+    features: ImportFeature[],
+  ): Promise<{ feature: ImportFeature; conflict: OverlapConflict }[]> {
+    if (features.length < 2) return [];
+    const payload = JSON.stringify(features.map((feature) => feature.geometry));
+    const rows = await this.prisma.$queryRaw<{ first: number; second: number; area: number }[]>`
+      WITH c AS (
+        SELECT (f.ordinality - 1)::int AS ord,
+               ST_Multi(ST_Force2D(ST_SetSRID(ST_GeomFromGeoJSON(f.value), 4326))) AS g
+        FROM jsonb_array_elements(${payload}::jsonb) WITH ORDINALITY AS f(value, ordinality)
+      )
+      SELECT a.ord AS first, b.ord AS second, x.area
+      FROM c AS a
+      JOIN c AS b ON a.ord < b.ord AND ST_Intersects(a.g, b.g)
+      CROSS JOIN LATERAL (SELECT ST_Area(ST_Intersection(a.g, b.g)::geography)::float8 AS area) AS x
+      WHERE x.area > ${OVERLAP_TOLERANCE_M2}::float8
+      ORDER BY b.ord, x.area DESC`;
+    return rows.map((row) => {
+      const other = features[row.first];
+      const feature = features[row.second];
+      return {
+        feature,
+        conflict: {
+          index: feature.index,
+          code: other.code,
+          name: other.name,
+          source: 'file',
+          overlapM2: row.area,
+        },
+      };
+    });
+  }
+
+  /**
+   * Serialises neighbourhood geometry writes per municipality for the rest of the
+   * transaction, so two concurrent writes cannot both pass the overlap check.
+   */
+  private async lockNeighborhoodWrites(db: RawDb, municipalityId: string): Promise<void> {
+    const key = `kent360:neighborhoods:${municipalityId}`;
+    await db.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`;
+  }
+
+  private async storedBoundary(actor: AuthUser, id: string): Promise<AreaGeometry | null> {
+    const [row] = await this.prisma.$queryRaw<{ boundary: AreaGeometry | null }[]>`
+      SELECT ST_AsGeoJSON(boundary)::json AS boundary FROM neighborhoods
+      WHERE id = ${id}::uuid AND municipality_id = ${actor.municipalityId}::uuid`;
+    return row?.boundary ?? null;
   }
 
   /** ST_IsValid for a batch of structurally valid geometries, in one round-trip. */
@@ -468,10 +633,36 @@ function codeTaken(): AppException {
 }
 
 function importFailed(failed: number, errors: NeighborhoodImportError[]): AppException {
+  if (importFailureIsOverlapOnly(errors)) {
+    return new AppException(
+      ErrorCode.NEIGHBORHOOD_BOUNDARY_OVERLAP,
+      `${failed} mahallenin sınırı başka mahallelerle çakışıyor; hiçbir kayıt içe aktarılmadı.`,
+      HttpStatus.CONFLICT,
+      { imported: 0, failed, errors },
+    );
+  }
   return new AppException(
     ErrorCode.NEIGHBORHOOD_IMPORT_FAILED,
     `${failed} mahalle doğrulanamadı; hiçbir kayıt içe aktarılmadı.`,
     HttpStatus.BAD_REQUEST,
     { imported: 0, failed, errors },
+  );
+}
+
+/** Single create/update: names the colliding neighbourhood(s), never returns geometry. */
+function overlapError(conflicts: OverlapConflict[]): AppException {
+  const [first] = conflicts;
+  const more = conflicts.length > 1 ? ` (+${conflicts.length - 1} mahalle daha)` : '';
+  return new AppException(
+    ErrorCode.NEIGHBORHOOD_BOUNDARY_OVERLAP,
+    `${overlapMessage(first)}${more}`,
+    HttpStatus.CONFLICT,
+    {
+      conflicts: conflicts.map((conflict) => ({
+        code: conflict.code,
+        name: conflict.name,
+        overlapM2: Math.round(conflict.overlapM2),
+      })),
+    },
   );
 }

@@ -150,6 +150,16 @@ Prisma şema dilinin ifade edemediği kurallar ayrı migration'dadır (`20260926
 - Geçerlilik iki katmanlı: uygulama yapıyı ve koordinat aralığını denetler, PostGIS `ST_IsValid` topolojiyi; aynı kurallar DB CHECK kısıtı olarak da vardır.
 - Geometri Prisma'nın `Unsupported` tipidir: okuma/yazma parametreli raw SQL ile yapılır ve her sorgu `municipality_id`'yi kendisi filtreler (`prisma.forTenant()` raw SQL'i kapsamaz).
 
+### Çakışma kuralı
+
+Aynı belediyenin **aktif** mahalleleri alan olarak çakışamaz: bir yer iki mahalleye birden ait görünmemelidir.
+
+- **Ölçüt:** `ST_Area(ST_Intersection(a, b)::geography)` – kesişimin sferoid üzerindeki gerçek alanı (m²). `ST_Intersects` yalnızca GIST index'li ön filtredir; tek başına kullanılsaydı ortak sınırı paylaşan komşuları da reddederdi (sınır temasında kesişim alanı 0'dır). `ST_Overlaps` da uygun değildir: bir poligon diğerini tamamen içeriyorsa `false` döner.
+- **Tolerans: 1 m²** (`OVERLAP_TOLERANCE_M2`). Ortak sınırlardaki kayan nokta / yeniden projeksiyon artefaktları bunun çok altındadır (6+ ondalık ≈ 10 cm), gerçek bir mükerrer atama ise onlarca m² ve üzeridir. 1 m² üstü her şerit raporlanır, sessizce kabul edilmez.
+- **Kapsam:** yeni mahalle, sınır güncellemesi, pasif mahallenin yeniden aktifleştirilmesi ve GeoJSON içe aktarma (dosya içi çiftler + kayıtlı mahalleler). Pasif mahalleler dikkate alınmaz. Farklı belediyeler birbirini etkilemez.
+- **Eşzamanlılık:** yazma transaction'ı belediye bazlı `pg_advisory_xact_lock` alır ve kontrolü kilit altında tekrarlar; iki eşzamanlı içe aktarma birbirine çakışan sınırları aynı anda yazamaz.
+- Kontrol servis katmanındadır (tolerans ve açıklayıcı hata gerektirdiği için CHECK/EXCLUDE kısıtı olarak ifade edilemez). `/resolve`'daki "küçük alan, sonra kod" kuralı güvenlik ağı olarak korunur; geçerli bir veri setinde yalnızca ortak sınır çizgisindeki noktalar için devreye girer.
+
 ### Demo mahalle geometrileri – RESMİ SINIR DEĞİLDİR
 
 Development seed'indeki beş mahalle (Karataş, Akkent, Güneykent, Dumlupınar, Binevler) **gerçek mahalle adlarıyla, uydurma geometriler** kullanır: Şahinbey merkezine yakın, birbirinden ayrık, basit dikdörtgenler (Binevler iki parçalı → MultiPolygon örneği). Harita, noktadan mahalle bulma ve MahallePulse demolarını mümkün kılmak içindir. Resmi sınır verisi (ör. belediye CBS birimi) elde edildiğinde `POST /neighborhoods/import` ile yüklenir; demo kayıtları pasifleştirilir. Tanımlar: `apps/api/prisma/seed-domain.ts`.
