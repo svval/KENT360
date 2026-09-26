@@ -104,6 +104,8 @@ Henüz geliştirilmemiş modüller sahte veri göstermez; `ModulePlaceholder` ha
 
 ## 8. Geri Bildirim Mesajları (Toast)
 
+Merkezi sistem: `useToast()` (`providers/toast-provider.tsx`) → `toast.success(title, description?)`, `toast.error(…)`, `toast.info(…)`. Başarı/bilgi `role="status"` (polite), hata `role="alert"` (assertive) canlı bölgelerinde duyurulur; hatalar 8 sn, diğerleri 5 sn görünür. Hata toast'ı sunucunun Türkçe `message`'ını açıklama olarak gösterir.
+
 Spesifik ol, kimi/neyi etkilediğini söyle:
 
 - ❌ `Success`, `İşlem başarılı`
@@ -140,3 +142,16 @@ Talepler tablosu kolonları: Talep No · Kategori · Mahalle · Müdürlük · �
 ## 13. Yerelleştirme
 
 UI metni Türkçe; kod, veritabanı ve API alanları İngilizce. Tarih/sayı biçimlendirme `Intl` ile (`tr-TR`, kullanıcının saat dilimi) yapılır: `25.09.2026 14:32`. Metinler bileşenlerde toplu tutulur; i18n kütüphanesine geçiş (ör. `next-intl`) anahtarlara çıkarma işidir, yeniden tasarım gerektirmez.
+
+## 14. Yönetim (Ayarlar) Ekranları
+
+Phase 4 ekranları (`/settings/*`) ortak kalıpları kullanır:
+
+- **Liste:** `Table` + sunucu tarafı sayfalama; arama ve durum filtresi URL'de (`useUrlState`). Boş sonuçta filtreye özel `EmptyState`.
+- **Oluştur / düzenle:** `Dialog` (Radix; odak tuzağı, Escape). Değiştirilemez alanlar (kod) `readOnly` gösterilir – `disabled` değil, çünkü disabled alan form değerlerinden düşer.
+- **Silme yok:** "Pasifleştir / Aktifleştir"; reddedilen işlemde sunucunun gerekçesi toast'ta gösterilir ("Bu müdürlüğe yönlendirilen 2 aktif kategori var…").
+- **Yetki:** menü öğeleri izinle gizlenir; okuma izni olup yazma izni olmayan kullanıcı ekranı **salt okunur** görür (aksiyon butonları yok, "Salt okunur" rozeti).
+- **Kategoriler:** solda aranabilir, açılır-kapanır ağaç; sağda seçili kategori detayı (seçim URL'de, `?id=`). SLA "1 gün (1440 dk)" ve miras alındıysa "Ana kategoriden" rozeti ile gösterilir; SLA girişinde birim (dakika/saat/gün) seçilir, API'ye dakika gider.
+- **Mahalleler:** tablo + şematik SVG sınır önizlemesi (altlıksız; etkileşimli harita Phase 9). Satırın üzerine gelinince önizlemede vurgulanır.
+- **GeoJSON içe aktarma:** dosya seç → istemcide ön kontrol ve özet tablo → "Yalnızca doğrula" (sunucuda `dryRun`) veya "İçe aktar" → öğe bazlı sunucu hataları listelenir; başarıda "12 mahalle başarıyla içe aktarıldı."
+- **Beyaz etiket:** belediye profili kaydedilince `/auth/me` yenilenir; logo ve renkler anında konsola uygulanır. Profil ekranında canlı önizleme bulunur.

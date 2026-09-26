@@ -7,7 +7,7 @@ Bu senaryo, pilot sunumunda **12–15 dakikada** ürünün uçtan uca değerini 
 ## Demo Belediyesi
 
 **Şahinbey Belediyesi / Gaziantep** (kurgusal demo kiracısı — belediye adı kodda değil, seed verisindedir).
-Örnek mahalleler: Karataş, Güneykent, Yeditepe, Beştepe, Akkent, Onur, Kolejtepe, Perilikaya, Barış, Bülbülzade, Mimar Sinan, Fatih.
+Seed mahalleleri: Karataş, Akkent, Güneykent, Dumlupınar, Binevler – **isimler gerçek, sınırlar demo geometridir** (basit dikdörtgenler, resmi sınır değil). Hikâye talebinin noktası (37.0585 K, 37.3710 D) Karataş poligonunun içindedir. Resmi sınırlar GeoJSON içe aktarma ile yüklenebilir.
 
 ## Demo Hesapları
 

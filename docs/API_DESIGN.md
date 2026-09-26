@@ -110,16 +110,26 @@ Durum: ✅ uygulandı · 🗓 planlandı (faz)
 | POST  | `/roles`                 | `roles.manage` – belediyeye özel rol (audit)                                 |
 | PUT   | `/roles/:id/permissions` | `roles.manage` (audit) – yalnız belediye rolleri; sistem rolleri salt okunur |
 
-### Organisation (Phase 4)
+### Organisation (Phase 4) ✅
 
-| Metot          | Yol                                         | İzin                                        |
-| -------------- | ------------------------------------------- | ------------------------------------------- |
-| GET            | `/municipalities/current`                   | public (marka bilgisi)                      |
-| PATCH          | `/municipalities/current`                   | `settings.manage` (audit)                   |
-| GET/POST/PATCH | `/departments`                              | okuma: oturum · yazma: `departments.manage` |
-| GET            | `/neighborhoods` · `/neighborhoods/geojson` | oturum                                      |
-| GET            | `/neighborhoods/lookup?lat=&lng=`           | oturum – noktadan mahalle                   |
-| GET/POST/PATCH | `/request-categories` (ağaç)                | yazma: `categories.manage`                  |
+Hiçbir uçta silme (DELETE) yoktur: kayıtlar `status: INACTIVE` ile pasifleştirilir. Kodlar (`code`) oluşturulduktan sonra değiştirilemez. Başka belediyenin kaydı her uçta `404` döner.
+
+| Metot              | Yol                                              | İzin                                                                                                                                                                |
+| ------------------ | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET                | `/municipality`                                  | `municipality.read` – oturumdaki kullanıcının belediyesi (liste yok)                                                                                                |
+| PATCH              | `/municipality`                                  | `municipality.update` (audit: `MUNICIPALITY_UPDATED`) – ad, il, logo, renkler, iletişim, adres, saat dilimi, harita merkezi; `slug` ve `status` değiştirilemez      |
+| GET                | `/departments`, `/departments/:id`               | `departments.read` · sayfalı, `search` (ad/kod), `status`, `sort`                                                                                                   |
+| POST / PATCH       | `/departments`, `/departments/:id`               | `departments.manage` (audit: `DEPARTMENT_CREATED/UPDATED/STATUS_CHANGED`). Aktif kategorilerin yönlendirildiği müdürlük pasifleştirilemez → `409 DEPARTMENT_IN_USE` |
+| GET                | `/neighborhoods`, `/neighborhoods/:id`           | `neighborhoods.read` · liste geometri özeti (tip, parça, km², merkez) döner; detay `boundary` (GeoJSON) içerir                                                      |
+| GET                | `/neighborhoods/geojson`                         | `neighborhoods.read` – **zarfsız** GeoJSON FeatureCollection (bkz. §8)                                                                                              |
+| GET                | `/neighborhoods/resolve?lat=&lng=`               | `neighborhoods.read` – `{ id, name, code }` veya `null`                                                                                                             |
+| POST / PATCH       | `/neighborhoods`, `/neighborhoods/:id`           | `neighborhoods.manage` (audit: `NEIGHBORHOOD_CREATED/UPDATED/STATUS_CHANGED`)                                                                                       |
+| POST               | `/neighborhoods/import[?dryRun=true]`            | `neighborhoods.manage` (audit: `NEIGHBORHOODS_IMPORTED`) – bkz. §8                                                                                                  |
+| GET                | `/request-categories`                            | `categories.read` · düz liste, sayfalı; `search`, `status`, `departmentId`, `parentId`                                                                              |
+| GET                | `/request-categories/tree[?status=]`             | `categories.read` – tüm ağaç tek istekte                                                                                                                            |
+| GET / POST / PATCH | `/request-categories/:id`, `/request-categories` | okuma `categories.read`, yazma `categories.manage` (audit: `CATEGORY_CREATED/UPDATED/STATUS_CHANGED`)                                                               |
+
+Kategori yanıtı yönlendirme ve SLA bilgisini hazır verir: `department { id, name, code, status }`, `defaultPriority`, `defaultSlaMinutes` (kendi değeri, `null` = miras), `effectiveSlaMinutes` (kendi ?? ana kategori), `slaLabel` ("4 saat", "1 gün 12 saat"). Kurallar ve hata kodları: [DATABASE_DESIGN.md §9](DATABASE_DESIGN.md#9-belediye-domaini-phase-4).
 
 ### Requests (Phase 5, AI: Phase 11)
 
@@ -184,3 +194,52 @@ Sunucu: (1) izin, (2) kiracı, (3) durum makinesi, (4) iş kuralları (AFTER fot
 ## 7. Versiyonlama
 
 URL tabanlı (`/api/v1`). Geriye uyumsuz değişiklik `/api/v2` ile gelir; v1 en az bir sürüm boyunca `Deprecation` header'ı ile birlikte yaşar.
+
+## 8. GeoJSON
+
+Tüm geometriler **RFC 7946 GeoJSON**, koordinatlar **WGS84 (EPSG:4326)** ve `[boylam, enlem]` sırasındadır.
+
+**Harita kaynağı – `GET /neighborhoods/geojson`.** Health uçları gibi zarf (`{ success, data }`) **içermez**; yanıt doğrudan MapLibre/Leaflet kaynağı olarak kullanılabilir (`Content-Type: application/geo+json`). Yalnız aktif ve sınırı olan mahalleler, 6 ondalık basamak (≈10 cm), properties'te yalnızca `id`, `name`, `code`. JSON PostgreSQL'de üretilip metin olarak iletilir (API parse/serialize etmez).
+
+```json
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "019…",
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [37.36, 37.05],
+              [37.372, 37.05],
+              [37.372, 37.062],
+              [37.36, 37.062],
+              [37.36, 37.05]
+            ]
+          ]
+        ]
+      },
+      "properties": { "id": "019…", "name": "Karataş", "code": "KARATAS" }
+    }
+  ]
+}
+```
+
+**İçe aktarma – `POST /neighborhoods/import`.** Gövde bir FeatureCollection'dır (en fazla 1000 Feature, 10 MB; diğer uçların gövde sınırı 100 kB). QGIS / ogr2ogr çıktısındaki `name`, `crs`, `bbox` üyeleri kabul edilir; `crs` verilmişse WGS84 (CRS84 / EPSG:4326) olmalıdır.
+
+| Alan                                           | Zorunlu | Kural                                                                                                                                                     |
+| ---------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `properties.name`                              | ✔       | 2–120 karakter                                                                                                                                            |
+| `properties.code`                              | ✔       | `^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$`, belediye içinde ve dosyada tekil                                                                                      |
+| `properties.district`, `properties.population` | –       | metin ≤ 80 / negatif olmayan tam sayı                                                                                                                     |
+| `geometry`                                     | ✔       | `Polygon` veya `MultiPolygon`; halkalar kapalı ve ≥ 4 nokta; koordinat aralığı; ≤ 100 000 köşe; **`ST_IsValid`** (kendi kendini kesen poligon reddedilir) |
+
+- **Ya hepsi ya hiçbiri:** önce bütün Feature'lar doğrulanır, dosyadaki tüm hatalar tek yanıtta döner, yalnızca tamamen geçerli dosya tek transaction'da yazılır.
+- **Mükerrer kod politikası (MVP):** belediyede aynı kodla mahalle varsa hata; üzerine yazma / upsert yok.
+- `?dryRun=true`: aynı doğrulama, kayıt yok → `{ imported: 0, failed: 0, dryRun: true, codes }`.
+- Başarı: `200 { imported, failed: 0, dryRun: false, codes }`. Hata: `400 NEIGHBORHOOD_IMPORT_FAILED`, `details: { imported: 0, failed, errors: [{ index, code, message }] }`.
+
+**Noktadan mahalle – `GET /neighborhoods/resolve`.** `ST_Covers` kullanılır, `ST_Contains` değil: `ST_Contains` sınır çizgisi üzerindeki noktayı "içeride" saymaz, dolayısıyla komşu mahallelerin ortak sınırındaki bir talep hiçbir mahalleye düşmezdi. `ST_Covers` ile sınırdaki nokta eşleşir; iki mahalle birden kapsıyorsa **alanı küçük olan**, sonra **kodu küçük olan** seçilir (deterministik). Sorgu GIST index'ini kullanır.

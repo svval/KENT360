@@ -4,23 +4,23 @@ Durum: ✅ tamamlandı · 🟡 kısmen · ⬜ planlandı
 
 İlke: **Önce uçtan uca MVP senaryosu kusursuz çalışır, sonra genişlik.** Her faz çalışır durumda ve testleri geçer halde bırakılır.
 
-| Faz | Kapsam                                                                     | Durum                                                  |
-| --- | -------------------------------------------------------------------------- | ------------------------------------------------------ |
-| 0   | Mimari, repository, dokümantasyon, monorepo                                | ✅                                                     |
-| 1   | Docker altyapısı, PostgreSQL/PostGIS, Redis, MinIO, Prisma şeması, env     | ✅ gerçek DB üzerinde doğrulandı                       |
-| 2   | Backend temeli: config, validation, hata formatı, loglama, Swagger, health | ✅                                                     |
-| 3   | Kimlik doğrulama ve yetkilendirme                                          | ✅                                                     |
-| 4   | Belediye domain'i: belediye, müdürlük, mahalle, kategori + seed            | ⬜                                                     |
-| 5   | Talep yönetimi: talepler, medya, history, workflow, SLA                    | ⬜                                                     |
-| 6   | İş emirleri: ekipler, atama, workflow, önce/sonra                          | ⬜                                                     |
-| 7   | Web temeli: login, layout, sidebar, topbar, tasarım sistemi                | 🟡 oturum ve route koruması hazır; toast sistemi eksik |
-| 8   | Yönetim arayüzü: dashboard, talepler, talep detayı, iş emirleri            | ⬜                                                     |
-| 9   | GIS: harita, kümeleme, heatmap, mahalleler                                 | ⬜                                                     |
-| 10  | MahallePulse: analitik, mahalle detayı                                     | ⬜                                                     |
-| 11  | AI: mock provider, sınıflandırma, öncelik, müdürlük önerisi, duplicate     | ⬜                                                     |
-| 12  | Saha360 mobil                                                              | ⬜                                                     |
-| 13  | Raporlar, bildirimler, audit arayüzü                                       | ⬜                                                     |
-| 14  | Test, güvenlik, performans, dokümantasyon, demo cilası                     | ⬜                                                     |
+| Faz | Kapsam                                                                     | Durum                            |
+| --- | -------------------------------------------------------------------------- | -------------------------------- |
+| 0   | Mimari, repository, dokümantasyon, monorepo                                | ✅                               |
+| 1   | Docker altyapısı, PostgreSQL/PostGIS, Redis, MinIO, Prisma şeması, env     | ✅ gerçek DB üzerinde doğrulandı |
+| 2   | Backend temeli: config, validation, hata formatı, loglama, Swagger, health | ✅                               |
+| 3   | Kimlik doğrulama ve yetkilendirme                                          | ✅                               |
+| 4   | Belediye domain'i: belediye, müdürlük, mahalle, kategori + seed            | ✅                               |
+| 5   | Talep yönetimi: talepler, medya, history, workflow, SLA                    | ⬜                               |
+| 6   | İş emirleri: ekipler, atama, workflow, önce/sonra                          | ⬜                               |
+| 7   | Web temeli: login, layout, sidebar, topbar, tasarım sistemi                | ✅                               |
+| 8   | Yönetim arayüzü: dashboard, talepler, talep detayı, iş emirleri            | ⬜                               |
+| 9   | GIS: harita, kümeleme, heatmap, mahalleler                                 | ⬜                               |
+| 10  | MahallePulse: analitik, mahalle detayı                                     | ⬜                               |
+| 11  | AI: mock provider, sınıflandırma, öncelik, müdürlük önerisi, duplicate     | ⬜                               |
+| 12  | Saha360 mobil                                                              | ⬜                               |
+| 13  | Raporlar, bildirimler, audit arayüzü                                       | ⬜                               |
+| 14  | Test, güvenlik, performans, dokümantasyon, demo cilası                     | ⬜                               |
 
 ---
 
@@ -58,11 +58,16 @@ Durum: ✅ tamamlandı · 🟡 kısmen · ⬜ planlandı
 - ✅ **Testler:** unit (parola, token, guard'lar, kilit politikası, tenant scope, sanitizer, sayfalama) + e2e (auth, rotation/reuse, logout, RBAC, tenant izolasyonu, audit)
 - ⏭ Vatandaş kaydı (`/auth/register`) Phase 8'e (vatandaş portalı) taşındı: belediye seçimi Phase 4 verisine bağlı
 
-## Phase 4 – Belediye Domain'i
+## Phase 4 – Belediye Domain'i ✅
 
-- Belediye profili/markası (`/municipalities/current`), müdürlükler, mahalleler (GeoJSON), kategori ağacı + SLA
-- **Seed:** 1 belediye (Şahinbey kurgusu), 5 müdürlük, 12+ gerçek Gaziantep mahallesi (yaklaşık poligonlar), tam kategori ağacı, 30+ kullanıcı, tüm roller/izinler. Seed idempotent ve < 10 sn.
-- Web: marka bilgisi API'den yüklenir
+- ✅ Belediye profili/markası (`GET/PATCH /municipality`), marka `/auth/me` ile konsola uygulanır
+- ✅ Müdürlükler (pasifleştirme, sabit kodlar, kullanımdaki müdürlük koruması)
+- ✅ Mahalleler: PostGIS MultiPolygon, GeoJSON FeatureCollection ucu, `resolve` (ST_Covers), ya-hepsi-ya-hiçbiri GeoJSON içe aktarma (+ dryRun)
+- ✅ İki seviyeli kategori ağacı: müdürlük yönlendirmesi, varsayılan öncelik, SLA (dakika, miras)
+- ✅ DB kuralları: geometri geçerliliği, kod biçimleri, SLA aralığı, aynı-kiracı trigger'ları
+- ✅ Web: `/settings/municipality`, `/settings/departments`, `/settings/categories`, `/settings/neighborhoods`; merkezi toast sistemi
+- ✅ **Seed:** 5 müdürlük, 5 ana / 13 alt kategori, 5 mahalle (**demo geometri**, resmi sınır değil – DATABASE_DESIGN §9); 5 demo hesap (Phase 3). Daha büyük örnek veri Phase 5–6 ile.
+- ✅ **Testler:** unit (geometri doğrulama, kategori kuralları, SLA biçimi) + e2e (tenant izolasyonu, Polygon/MultiPolygon, geçersiz GeoJSON/PostGIS, resolve ve sınır davranışı, FeatureCollection, import rollback, hiyerarşi, SLA, RBAC, audit)
 
 ## Phase 5 – Talep Yönetimi
 
@@ -78,11 +83,11 @@ Durum: ✅ tamamlandı · 🟡 kısmen · ⬜ planlandı
 - Konum doğrulama, AFTER fotoğrafı zorunluluğu, talep↔iş emri senkronu
 - **Seed:** 8 saha ekibi, 40+ iş emri, önce/sonra fotoğraflı demo senaryosu (KNT-2026-001248 / WO-2026-000883)
 
-## Phase 7 – Web Temeli 🟡
+## Phase 7 – Web Temeli ✅
 
 - ✅ Tasarım token'ları, Inter, sidebar (daraltılabilir, mobil çekmece), topbar (breadcrumb, arama, API durumu, kullanıcı menüsü), sayfa iskeletleri, login ekranı
 - ✅ Gerçek oturum yönetimi, route koruması, izin bazlı menü (Phase 3)
-- ⬜ Toast sistemi
+- ✅ Toast sistemi (Phase 4)
 
 ## Phase 8 – Yönetim Arayüzü
 
