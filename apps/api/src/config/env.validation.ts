@@ -1,8 +1,11 @@
 import { z } from 'zod';
+import { DURATION_PATTERN, parseDurationSeconds } from '../common/utils/duration';
 
 const booleanString = z
   .enum(['true', 'false', '1', '0'])
   .transform((value) => value === 'true' || value === '1');
+
+const duration = z.string().regex(DURATION_PATTERN, 'must look like 900s, 15m, 12h or 7d');
 
 /**
  * Environment contract. The process refuses to start with an invalid configuration
@@ -34,8 +37,11 @@ export const envSchema = z.object({
 
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
   JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
-  JWT_ACCESS_TTL: z.string().default('15m'),
-  JWT_REFRESH_TTL: z.string().default('7d'),
+  /** Durations such as 900s, 15m, 12h, 7d – exposed to the app as seconds. */
+  JWT_ACCESS_TTL: duration.default('15m').transform(parseDurationSeconds),
+  JWT_REFRESH_TTL: duration.default('7d').transform(parseDurationSeconds),
+  /** Secure flag of the refresh cookie; defaults to true in production. */
+  AUTH_COOKIE_SECURE: booleanString.optional(),
 
   AI_PROVIDER: z.enum(['mock']).default('mock'),
   AI_API_KEY: z.string().optional(),

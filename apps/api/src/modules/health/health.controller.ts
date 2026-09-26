@@ -8,6 +8,7 @@ import {
 import { SkipThrottle } from '@nestjs/throttler';
 import { type HealthStatus } from '@kent360/shared-types';
 import { type Response } from 'express';
+import { Public } from '../../common/decorators/auth.decorators';
 import { RawResponse } from '../../common/decorators/raw-response.decorator';
 import { HealthService } from './health.service';
 
@@ -15,6 +16,7 @@ import { HealthService } from './health.service';
 @Controller('health')
 @RawResponse()
 @SkipThrottle()
+@Public()
 export class HealthController {
   constructor(private readonly health: HealthService) {}
 

@@ -25,6 +25,17 @@ describe('validateEnv', () => {
     expect(env.CORS_ORIGINS).toEqual(['http://localhost:3000', 'https://kent360.example.gov.tr']);
   });
 
+  it('exposes token lifetimes in seconds', () => {
+    expect(validateEnv(validEnv)).toMatchObject({ JWT_ACCESS_TTL: 900, JWT_REFRESH_TTL: 604_800 });
+    expect(validateEnv({ ...validEnv, JWT_ACCESS_TTL: '5m' }).JWT_ACCESS_TTL).toBe(300);
+  });
+
+  it('rejects malformed token lifetimes', () => {
+    expect(() => validateEnv({ ...validEnv, JWT_REFRESH_TTL: 'one week' })).toThrow(
+      /JWT_REFRESH_TTL/,
+    );
+  });
+
   it('rejects short JWT secrets', () => {
     expect(() => validateEnv({ ...validEnv, JWT_SECRET: 'short' })).toThrow(/JWT_SECRET/);
   });

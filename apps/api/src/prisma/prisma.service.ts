@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/prisma/client';
 import { type Env } from '../config/env.validation';
+import { tenantScopeExtension } from '../common/tenant/tenant-scope';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
@@ -27,6 +28,14 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
         'Could not connect to PostgreSQL – is the infrastructure running? (npm run infra:up)',
       );
     }
+  }
+
+  /**
+   * Client whose tenant-owned models are confined to one municipality.
+   * Use this for every tenant data access; see common/tenant/tenant-scope.ts.
+   */
+  forTenant(municipalityId: string) {
+    return this.$extends(tenantScopeExtension(municipalityId));
   }
 
   async onModuleDestroy(): Promise<void> {

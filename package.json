@@ -43,6 +43,7 @@
     "@prisma/engines@7.10.0": true,
     "esbuild@0.28.2": true,
     "unrs-resolver@1.12.2": true,
-    "@parcel/watcher@2.6.0": true
+    "@parcel/watcher@2.6.0": true,
+    "argon2@0.45.1": true
   }
 }
