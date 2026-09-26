@@ -1,0 +1,23 @@
+{
+  "name": "@kent360/config",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared TypeScript and ESLint configuration for KENT360 workspaces",
+  "files": [
+    "tsconfig.base.json",
+    "eslint.base.mjs"
+  ],
+  "exports": {
+    "./tsconfig.base.json": "./tsconfig.base.json",
+    "./eslint": "./eslint.base.mjs"
+  },
+  "dependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.12.0",
+    "typescript-eslint": "^8.70.1"
+  },
+  "peerDependencies": {
+    "eslint": "^9.0.0"
+  }
+}

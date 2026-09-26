@@ -1,0 +1,217 @@
+# KENT360
+
+**Smart Municipal Operations & Urban Intelligence Platform**
+_Akıllı Belediye Operasyon ve Kent Zekâsı Platformu_
+
+KENT360 manages the full lifecycle of a municipal service request — from a citizen's photo and map pin, through AI-assisted triage, duplicate detection and department routing, to field-crew work orders with before/after evidence — and turns that operational data into neighbourhood-level urban intelligence.
+
+> **Status:** Phase 0–1 complete (architecture, monorepo, data model, infrastructure), backend and web foundations running. See the [roadmap](docs/DEVELOPMENT_ROADMAP.md).
+
+---
+
+## Features
+
+| Module                     | What it does                                                                                                                               |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Kent Operasyon Merkezi** | Operations dashboard: live KPIs, clustered city map, SLA compliance, critical queue                                                        |
+| **Akıllı Talep Yönetimi**  | AI-suggested category / department / priority / risk, explainable duplicate detection, status workflow engine, SLA tracking, full timeline |
+| **Saha360**                | Field teams, assignment history, work-order workflow, location check-in, BEFORE / DURING / AFTER photo evidence, React Native app          |
+| **MahallePulse**           | Neighbourhood analytics: volume, resolution time, SLA success, top issues, trends, rule-based anomaly alerts                               |
+| **Platform**               | Multi-municipality & white-label branding, RBAC with fine-grained permissions, immutable audit log, in-app notifications, CSV reports      |
+
+## Architecture
+
+A **modular monolith**: one deployable NestJS API with strict domain modules, backed by PostgreSQL + PostGIS. Chosen deliberately over microservices for transactional consistency (request + work order + history in one transaction), simple operations and a small-team-friendly codebase — while keeping module boundaries clean enough to extract a service later.
+
+```
+ Next.js web console ─┐                    ┌─ PostgreSQL 17 + PostGIS 3.5 + pg_trgm
+                      ├─► NestJS API /api/v1 ─┼─ Redis 8 (cache, rate limit, jobs)
+ Expo field app ──────┘                    └─ MinIO / S3 (photo evidence)
+```
+
+Highlights of the design:
+
+- **Spatial by default** – request and work-order points are PostGIS geometries kept in sync with lat/lng by DB triggers; GIST indexes power map bounding-box queries, point-in-polygon neighbourhood lookup and proximity checks.
+- **Explainable duplicate detection** – distance, category, trigram text similarity and time components are stored individually, not just a total score.
+- **Race-free public numbers** – `KNT-2026-000001` / `WO-2026-000001` from an atomic `INSERT … ON CONFLICT … RETURNING` counter per municipality and year.
+- **Workflow as state machines** – request and work-order transitions are validated domain rules, exposed as intent endpoints (`POST /work-orders/:id/transitions`), never free-form status writes.
+- **AI suggests, humans decide** – provider-agnostic `AIProvider` interface with an offline `MockAIProvider`; suggestion acceptance is recorded to measure accuracy.
+- **Append-only audit trail** – enforced by database triggers, not just application code.
+
+Details: [ARCHITECTURE.md](docs/ARCHITECTURE.md) · [DATABASE_DESIGN.md](docs/DATABASE_DESIGN.md) · [API_DESIGN.md](docs/API_DESIGN.md)
+
+## Tech Stack
+
+| Layer    | Technology                                                                                                                   |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Backend  | NestJS 11, TypeScript 5.9 (strict), Prisma 7 (driver adapter `pg`), class-validator, Zod (env), Swagger/OpenAPI, pino        |
+| Database | PostgreSQL 17, PostGIS 3.5, pg_trgm                                                                                          |
+| Web      | Next.js 16 (App Router), React 19, Tailwind CSS 4, shadcn/ui approach (Radix), TanStack Query, React Hook Form + Zod, Lucide |
+| Maps     | MapLibre GL JS                                                                                                               |
+| Mobile   | React Native + Expo                                                                                                          |
+| Infra    | Docker Compose, Redis 8, MinIO (S3 API)                                                                                      |
+| Quality  | Jest, Supertest, ESLint 9, Prettier                                                                                          |
+
+Version choices (e.g. NestJS 11 over the ESM-only 12, ESLint 9 for Next.js plugin compatibility) are justified in [ARCHITECTURE.md § 10](docs/ARCHITECTURE.md#10-teknoloji-ve-sürüm-kararları).
+
+## Project Structure
+
+```
+kent360/
+├── apps/
+│   ├── api/                  NestJS API
+│   │   ├── prisma/           schema.prisma + migrations
+│   │   ├── src/
+│   │   │   ├── common/       errors, filters, interceptors, utils
+│   │   │   ├── config/       validated environment
+│   │   │   ├── modules/      domain modules (health, auth, requests, …)
+│   │   │   └── prisma/       PrismaService
+│   │   └── test/             e2e tests
+│   ├── web/                  Next.js console & citizen portal
+│   │   └── src/{app,components,hooks,lib,providers}
+│   └── mobile/               Saha360 (Phase 12)
+├── packages/
+│   ├── shared-types/         enums, permission catalogue, API contracts
+│   └── config/               shared tsconfig + ESLint config
+├── infrastructure/           Postgres init SQL, MinIO bucket bootstrap
+├── docs/                     architecture, database, API, UI/UX, security, roadmap, demo
+└── docker-compose.yml
+```
+
+## Prerequisites
+
+- **Node.js 22 LTS** or newer (`node --version`)
+- **npm 10+**
+- **Docker Desktop** (with WSL 2 on Windows) for PostgreSQL/PostGIS, Redis and MinIO
+- Git
+
+## Installation
+
+```powershell
+git clone <repo-url> kent360
+cd kent360
+Copy-Item .env.example .env
+npm install
+```
+
+`npm install` also builds `@kent360/shared-types` and generates the Prisma client.
+
+## Docker
+
+```powershell
+npm run infra:up        # docker compose up -d
+docker compose ps       # postgres and redis should be "healthy"
+npm run infra:logs
+npm run infra:down      # stop (data is kept in named volumes)
+```
+
+| Service              | Container          | Port                                 |
+| -------------------- | ------------------ | ------------------------------------ |
+| PostgreSQL + PostGIS | `kent360-postgres` | 5432                                 |
+| Redis                | `kent360-redis`    | 6379                                 |
+| MinIO API / Console  | `kent360-minio`    | 9000 / [9001](http://localhost:9001) |
+
+The `kent360-minio-init` job creates the private `kent360-media` bucket and exits.
+Ports can be changed in `.env` (`POSTGRES_PORT`, `REDIS_PORT`, …) if they collide with local services.
+
+## Environment
+
+All variables are documented in [`.env.example`](.env.example). The API validates them at startup and refuses to boot with an invalid configuration (and, in production, with the example JWT secrets). The web app reads `NEXT_PUBLIC_*` values from `apps/web/.env.local` (see `apps/web/.env.example`).
+
+## Database Migration
+
+```powershell
+npm run db:deploy       # apply migrations (prisma migrate deploy)
+npm run db:migrate      # create a new migration during development (prisma migrate dev)
+npm run db:studio       # browse data
+```
+
+Migrations: `20260926000000_init` (generated from the Prisma schema) and `20260926000100_db_rules` (spatial triggers, CHECK constraints, append-only audit log).
+
+## Seed
+
+Demo seed data (municipality, departments, neighbourhood polygons, categories, users, 150+ requests, 40+ work orders) arrives in Phases 4–6:
+
+```powershell
+npm run db:seed         # available from Phase 4
+```
+
+## Start Backend
+
+```powershell
+npm run dev:api
+```
+
+- API: http://localhost:4000/api/v1
+- Liveness: http://localhost:4000/health → `{ "status": "ok", … }`
+- Readiness: http://localhost:4000/health/ready (checks PostgreSQL + PostGIS, 503 when down)
+
+## Start Web
+
+```powershell
+npm run dev:web         # http://localhost:3000
+npm run dev             # API + web together
+```
+
+The top bar shows a live system status pill (_Sistem çevrimiçi / Veritabanı yok / API çevrimdışı_).
+
+## Start Mobile
+
+Saha360 is scaffolded in Phase 12 — see [`apps/mobile/README.md`](apps/mobile/README.md).
+
+## Demo Accounts
+
+Created by the seed (Phase 4). **Development only — never run the seed against a production database.**
+
+| Role               | Email                   | Password       |
+| ------------------ | ----------------------- | -------------- |
+| System Admin       | `admin@kent360.local`   | `Kent360!Demo` |
+| Department Manager | `manager@kent360.local` | `Kent360!Demo` |
+| Team Leader        | `leader@kent360.local`  | `Kent360!Demo` |
+| Field Staff        | `field@kent360.local`   | `Kent360!Demo` |
+| Citizen            | `citizen@kent360.local` | `Kent360!Demo` |
+
+Full walkthrough: [DEMO_SCENARIO.md](docs/DEMO_SCENARIO.md).
+
+## Swagger
+
+http://localhost:4000/api/docs (OpenAPI JSON: `/api/docs/openapi.json`). Enabled by default outside production; controlled by `SWAGGER_ENABLED`.
+
+## Testing
+
+```powershell
+npm test                              # unit tests (all workspaces)
+npm run test:e2e -w @kent360/api      # API e2e (boots the full app)
+npm run typecheck
+npm run lint
+```
+
+## Roadmap
+
+| Phase | Scope                                                         | Status |
+| ----- | ------------------------------------------------------------- | ------ |
+| 0     | Architecture, monorepo, documentation                         | ✅     |
+| 1     | Docker, PostGIS, Redis, MinIO, Prisma data model              | ✅     |
+| 2     | Backend foundation (config, errors, logging, Swagger, health) | 🟡     |
+| 3     | Authentication & RBAC                                         | ⬜     |
+| 4     | Municipality domain + seed                                    | ⬜     |
+| 5     | Request management, workflow, SLA                             | ⬜     |
+| 6     | Work orders, teams, before/after                              | ⬜     |
+| 7     | Web foundation (layout, design system, login)                 | 🟡     |
+| 8     | Management UI                                                 | ⬜     |
+| 9     | GIS: map, clustering, heatmap                                 | ⬜     |
+| 10    | MahallePulse analytics                                        | ⬜     |
+| 11    | AI classification & duplicate detection                       | ⬜     |
+| 12    | Saha360 mobile                                                | ⬜     |
+| 13    | Reports, notifications, audit UI                              | ⬜     |
+| 14    | Hardening & demo polish                                       | ⬜     |
+
+## Screenshots
+
+| Operations dashboard | Live map      | Request detail | Saha360       |
+| -------------------- | ------------- | -------------- | ------------- |
+| _coming soon_        | _coming soon_ | _coming soon_  | _coming soon_ |
+
+## Documentation
+
+[Project overview](docs/PROJECT_OVERVIEW.md) · [Architecture](docs/ARCHITECTURE.md) · [Database](docs/DATABASE_DESIGN.md) · [API](docs/API_DESIGN.md) · [UI/UX](docs/UI_UX_GUIDE.md) · [Security](docs/SECURITY.md) · [Roadmap](docs/DEVELOPMENT_ROADMAP.md) · [Demo](docs/DEMO_SCENARIO.md)

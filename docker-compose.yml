@@ -1,0 +1,80 @@
+# KENT360 – development infrastructure
+# Usage: docker compose up -d   (see README → Docker)
+
+name: kent360
+
+services:
+  postgres:
+    image: postgis/postgis:17-3.5
+    container_name: kent360-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-kent360}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kent360_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-kent360}
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - kent360-postgres-data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-kent360} -d ${POSTGRES_DB:-kent360}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:8.8-alpine
+    container_name: kent360-redis
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes', '--save', '60', '1000']
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - kent360-redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Upstream MinIO stopped publishing container images (late 2025); pgsty/minio is a
+  # maintained community build of the same server. The API talks to it only through the
+  # S3 protocol, so swapping to AWS S3 or another S3-compatible store is a config change.
+  minio:
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    container_name: kent360-minio
+    restart: unless-stopped
+    command: ['server', '/data', '--console-address', ':9001']
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-kent360}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-kent360_dev_secret}
+    ports:
+      - '${MINIO_PORT:-9000}:9000'
+      - '${MINIO_CONSOLE_PORT:-9001}:9001'
+    volumes:
+      - kent360-minio-data:/data
+    # No container healthcheck: the community image does not guarantee curl/wget.
+    # Readiness is probed from minio-init with `mc ready` instead.
+
+  # One-shot job: waits until MinIO is ready, creates the media bucket, then exits.
+  minio-init:
+    image: pgsty/mc:RELEASE.2026-09-16T00-00-00Z
+    container_name: kent360-minio-init
+    depends_on:
+      - minio
+    environment:
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-kent360}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-kent360_dev_secret}
+      MINIO_BUCKET: ${MINIO_BUCKET:-kent360-media}
+    entrypoint: ['/bin/sh', '/scripts/create-bucket.sh']
+    volumes:
+      - ./infrastructure/minio/create-bucket.sh:/scripts/create-bucket.sh:ro
+    restart: 'no'
+
+volumes:
+  kent360-postgres-data:
+  kent360-redis-data:
+  kent360-minio-data:

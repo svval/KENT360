@@ -1,0 +1,828 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// KENT360 – database schema (PostgreSQL 17 + PostGIS 3.5)
+//
+// Conventions
+//  • Models are PascalCase / fields camelCase; tables & columns are snake_case.
+//  • Primary keys are UUIDv7 (time-ordered → index-friendly, not guessable).
+//  • All timestamps are timestamptz and stored in UTC.
+//  • Spatial columns use SRID 4326 (WGS84). Point columns are maintained by DB
+//    triggers from latitude/longitude, so application code never writes geometry
+//    directly (see migration 000001_init). Prisma exposes them as Unsupported.
+//  • Tenant-owned rows carry municipalityId (multi-municipality / white-label).
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  moduleFormat    = "cjs"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  extensions = [postgis, pg_trgm]
+}
+
+// ═════════════════════════════════════════ Enums ═════════════════════════════
+
+enum RecordStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum UserStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+  DISABLED
+}
+
+enum RequestStatus {
+  NEW
+  AI_ANALYZED
+  UNDER_REVIEW
+  ASSIGNED_TO_DEPARTMENT
+  WORK_ORDER_CREATED
+  IN_PROGRESS
+  RESOLVED
+  VERIFIED
+  CLOSED
+  REJECTED
+}
+
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum RequestSource {
+  WEB
+  MOBILE
+  CALL_CENTER
+  MUNICIPAL_STAFF
+  API
+}
+
+enum RequestEventType {
+  CREATED
+  AI_ANALYZED
+  STATUS_CHANGED
+  CATEGORY_CHANGED
+  PRIORITY_CHANGED
+  DEPARTMENT_ASSIGNED
+  WORK_ORDER_CREATED
+  MEDIA_ADDED
+  COMMENT_ADDED
+  DUPLICATE_LINKED
+  CITIZEN_JOINED
+  SLA_AT_RISK
+  SLA_BREACHED
+}
+
+enum MediaKind {
+  IMAGE
+}
+
+enum WorkOrderStatus {
+  CREATED
+  ASSIGNED
+  ACCEPTED
+  EN_ROUTE
+  ON_SITE
+  IN_PROGRESS
+  WAITING
+  COMPLETED
+  VERIFIED
+  CANCELLED
+}
+
+enum WorkOrderMediaType {
+  BEFORE
+  DURING
+  AFTER
+}
+
+enum WorkOrderEventType {
+  CREATED
+  STATUS_CHANGED
+  ASSIGNED
+  REASSIGNED
+  MEDIA_ADDED
+  COMMENT_ADDED
+  LOCATION_CHECK_FAILED
+}
+
+enum FieldTeamMemberRole {
+  LEADER
+  MEMBER
+}
+
+enum NotificationType {
+  REQUEST_CREATED
+  REQUEST_CRITICAL
+  REQUEST_STATUS_CHANGED
+  WORK_ORDER_CREATED
+  WORK_ORDER_ASSIGNED
+  WORK_ORDER_COMPLETED
+  SLA_AT_RISK
+  SLA_BREACHED
+  SYSTEM
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+  PUSH
+}
+
+enum DuplicateMatchStatus {
+  SUGGESTED
+  CONFIRMED
+  DISMISSED
+}
+
+enum CommentVisibility {
+  INTERNAL
+  PUBLIC
+}
+
+enum SequenceScope {
+  REQUEST
+  WORK_ORDER
+}
+
+// ═════════════════════════════════ Tenancy & organisation ════════════════════
+
+/// A municipality (tenant). Branding fields drive the white-label UI.
+model Municipality {
+  id             String       @id @default(uuid(7)) @db.Uuid
+  name           String       @db.VarChar(160)
+  slug           String       @unique @db.VarChar(80)
+  city           String       @db.VarChar(80)
+  logoUrl        String?      @map("logo_url") @db.VarChar(500)
+  primaryColor   String       @default("#2563EB") @map("primary_color") @db.VarChar(9)
+  secondaryColor String       @default("#0891B2") @map("secondary_color") @db.VarChar(9)
+  contactEmail   String?      @map("contact_email") @db.VarChar(160)
+  contactPhone   String?      @map("contact_phone") @db.VarChar(32)
+  website        String?      @db.VarChar(255)
+  address        String?      @db.VarChar(500)
+  timezone       String       @default("Europe/Istanbul") @db.VarChar(64)
+  locale         String       @default("tr-TR") @db.VarChar(16)
+  /// Map default view: centre and zoom used when the operator opens the live map.
+  mapCenterLat   Float?       @map("map_center_lat")
+  mapCenterLng   Float?       @map("map_center_lng")
+  mapZoom        Float?       @map("map_zoom")
+  /// Tenant-level feature flags and thresholds (e.g. duplicate radius, SLA risk ratio).
+  settings       Json         @default("{}")
+  status         RecordStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  users          User[]
+  roles          Role[]
+  departments    Department[]
+  neighborhoods  Neighborhood[]
+  categories     RequestCategory[]
+  requests       Request[]
+  fieldTeams     FieldTeam[]
+  workOrders     WorkOrder[]
+  notifications  Notification[]
+  auditLogs      AuditLog[]
+  sequences      NumberSequence[]
+
+  @@map("municipalities")
+}
+
+model Department {
+  id             String       @id @default(uuid(7)) @db.Uuid
+  municipalityId String       @map("municipality_id") @db.Uuid
+  name           String       @db.VarChar(160)
+  code           String       @db.VarChar(40)
+  description    String?      @db.Text
+  contactEmail   String?      @map("contact_email") @db.VarChar(160)
+  status         RecordStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  municipality          Municipality      @relation(fields: [municipalityId], references: [id], onDelete: Restrict)
+  users                 User[]
+  categories            RequestCategory[]
+  requests              Request[]
+  fieldTeams            FieldTeam[]
+  workOrders            WorkOrder[]
+  aiSuggestedAnalyses   AIAnalysis[]      @relation("AISuggestedDepartment")
+
+  @@unique([municipalityId, code])
+  @@map("departments")
+}
+
+/// Neighbourhood (mahalle). Boundary drives point-in-polygon lookup and choropleth maps.
+model Neighborhood {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  municipalityId String   @map("municipality_id") @db.Uuid
+  name           String   @db.VarChar(120)
+  code           String   @db.VarChar(40)
+  district       String?  @db.VarChar(80)
+  population     Int?
+  /// MultiPolygon, SRID 4326. Written via raw SQL (ST_GeomFromGeoJSON).
+  boundary       Unsupported("geometry(MultiPolygon, 4326)")?
+  /// Representative point (label/marker placement). Maintained from boundary by trigger.
+  center         Unsupported("geometry(Point, 4326)")?
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  municipality Municipality @relation(fields: [municipalityId], references: [id], onDelete: Restrict)
+  requests     Request[]
+
+  @@unique([municipalityId, code])
+  @@index([boundary], type: Gist)
+  @@map("neighborhoods")
+}
+
+// ═════════════════════════════════ Identity & access ═════════════════════════
+
+model User {
+  id                String     @id @default(uuid(7)) @db.Uuid
+  municipalityId    String     @map("municipality_id") @db.Uuid
+  departmentId      String?    @map("department_id") @db.Uuid
+  firstName         String     @map("first_name") @db.VarChar(80)
+  lastName          String     @map("last_name") @db.VarChar(80)
+  /// Stored lower-cased; login is case-insensitive.
+  email             String     @unique @db.VarChar(160)
+  phone             String?    @db.VarChar(32)
+  /// Argon2id hash. The plaintext password is never stored or logged.
+  passwordHash      String     @map("password_hash") @db.VarChar(255)
+  status            UserStatus @default(ACTIVE)
+  failedLoginCount  Int        @default(0) @map("failed_login_count")
+  lockedUntil       DateTime?  @map("locked_until") @db.Timestamptz(3)
+  lastLoginAt       DateTime?  @map("last_login_at") @db.Timestamptz(3)
+  createdAt         DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  municipality          Municipality          @relation(fields: [municipalityId], references: [id], onDelete: Restrict)
+  department            Department?           @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  roles                 UserRole[]            @relation("UserRoles")
+  rolesGranted          UserRole[]            @relation("UserRolesGrantedBy")
+  refreshTokens         RefreshToken[]
+  requestsCreated       Request[]             @relation("RequestCreatedBy")
+  requestFollows        RequestFollower[]
+  requestMedia          RequestMedia[]
+  requestHistory        RequestHistory[]
+  teamMemberships       FieldTeamMember[]
+  teamsLed              FieldTeam[]           @relation("FieldTeamLeader")
+  workOrdersCreated     WorkOrder[]           @relation("WorkOrderCreatedBy")
+  workOrdersAssigned    WorkOrder[]           @relation("WorkOrderAssignedUser")
+  assignmentsReceived   WorkOrderAssignment[] @relation("AssignmentAssignee")
+  assignmentsMade       WorkOrderAssignment[] @relation("AssignmentAssignedBy")
+  workOrderMedia        WorkOrderMedia[]
+  workOrderHistory      WorkOrderHistory[]
+  notifications         Notification[]
+  comments              Comment[]
+  duplicateDecisions    DuplicateMatch[]
+  auditLogs             AuditLog[]
+
+  @@index([municipalityId, status])
+  @@index([departmentId])
+  @@map("users")
+}
+
+/// Roles are either system roles (municipalityId = null, seeded) or tenant-custom roles.
+model Role {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  municipalityId String?  @map("municipality_id") @db.Uuid
+  code           String   @db.VarChar(60)
+  name           String   @db.VarChar(120)
+  description    String?  @db.Text
+  isSystem       Boolean  @default(false) @map("is_system")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  municipality Municipality?    @relation(fields: [municipalityId], references: [id], onDelete: Cascade)
+  users        UserRole[]
+  permissions  RolePermission[]
+
+  @@unique([municipalityId, code])
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  /// Dotted code, e.g. "workOrders.assign". Mirrors @kent360/shared-types Permission.
+  code        String   @unique @db.VarChar(80)
+  name        String   @db.VarChar(160)
+  description String?  @db.Text
+  group       String   @db.VarChar(60)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model UserRole {
+  userId      String   @map("user_id") @db.Uuid
+  roleId      String   @map("role_id") @db.Uuid
+  grantedById String?  @map("granted_by_id") @db.Uuid
+  grantedAt   DateTime @default(now()) @map("granted_at") @db.Timestamptz(3)
+
+  user      User  @relation("UserRoles", fields: [userId], references: [id], onDelete: Cascade)
+  role      Role  @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  grantedBy User? @relation("UserRolesGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  roleId       String @map("role_id") @db.Uuid
+  permissionId String @map("permission_id") @db.Uuid
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
+
+/// Refresh tokens are stored hashed. Tokens issued from the same login share a familyId:
+/// presenting an already-rotated token revokes the whole family (reuse detection).
+model RefreshToken {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  familyId     String    @map("family_id") @db.Uuid
+  tokenHash    String    @unique @map("token_hash") @db.VarChar(128)
+  expiresAt    DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt    DateTime? @map("revoked_at") @db.Timestamptz(3)
+  replacedById String?   @map("replaced_by_id") @db.Uuid
+  ipAddress    String?   @map("ip_address") @db.VarChar(64)
+  userAgent    String?   @map("user_agent") @db.VarChar(500)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_tokens")
+}
+
+// ═════════════════════════════════ Citizen requests ══════════════════════════
+
+/// Hierarchical category tree (parentId = null → top-level category).
+model RequestCategory {
+  id                String       @id @default(uuid(7)) @db.Uuid
+  municipalityId    String       @map("municipality_id") @db.Uuid
+  parentId          String?      @map("parent_id") @db.Uuid
+  departmentId      String?      @map("department_id") @db.Uuid
+  name              String       @db.VarChar(120)
+  code              String       @db.VarChar(60)
+  description       String?      @db.Text
+  /// Lucide icon name rendered by web/mobile clients.
+  icon              String?      @db.VarChar(60)
+  defaultPriority   Priority     @default(NORMAL) @map("default_priority")
+  /// Resolution SLA in minutes; inherited from the parent when null.
+  defaultSlaMinutes Int?         @map("default_sla_minutes")
+  /// Lower-cased keywords used by the rule-based (mock) classifier.
+  keywords          String[]     @default([])
+  sortOrder         Int          @default(0) @map("sort_order")
+  status            RecordStatus @default(ACTIVE)
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  municipality        Municipality      @relation(fields: [municipalityId], references: [id], onDelete: Restrict)
+  parent              RequestCategory?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children            RequestCategory[] @relation("CategoryTree")
+  department          Department?       @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  requests            Request[]
+  aiSuggestedAnalyses AIAnalysis[]      @relation("AISuggestedCategory")
+
+  @@unique([municipalityId, code])
+  @@index([parentId])
+  @@map("request_categories")
+}
+
+model Request {
+  id             String        @id @default(uuid(7)) @db.Uuid
+  municipalityId String        @map("municipality_id") @db.Uuid
+  /// Human-readable number, e.g. KNT-2026-000001 (see NumberSequence).
+  publicNumber   String        @unique @map("public_number") @db.VarChar(32)
+  createdById    String?       @map("created_by_id") @db.Uuid
+  categoryId     String?       @map("category_id") @db.Uuid
+  departmentId   String?       @map("department_id") @db.Uuid
+  neighborhoodId String?       @map("neighborhood_id") @db.Uuid
+  title          String        @db.VarChar(200)
+  description    String        @db.Text
+  status         RequestStatus @default(NEW)
+  priority       Priority      @default(NORMAL)
+  riskLevel      RiskLevel?    @map("risk_level")
+  source         RequestSource @default(WEB)
+  latitude       Float
+  longitude      Float
+  /// Point, SRID 4326 – derived from latitude/longitude by trigger; GIST indexed.
+  location       Unsupported("geometry(Point, 4326)")?
+  address        String?       @db.VarChar(500)
+  aiAnalyzed     Boolean       @default(false) @map("ai_analyzed")
+  /// Number of citizens who joined this request instead of filing a duplicate.
+  supporterCount Int           @default(0) @map("supporter_count")
+  slaDueAt       DateTime?     @map("sla_due_at") @db.Timestamptz(3)
+  rejectionReason String?      @map("rejection_reason") @db.Text
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  resolvedAt     DateTime?     @map("resolved_at") @db.Timestamptz(3)
+  closedAt       DateTime?     @map("closed_at") @db.Timestamptz(3)
+
+  municipality     Municipality      @relation(fields: [municipalityId], references: [id], onDelete: Restrict)
+  createdBy        User?             @relation("RequestCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  category         RequestCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  department       Department?       @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  neighborhood     Neighborhood?     @relation(fields: [neighborhoodId], references: [id], onDelete: SetNull)
+  media            RequestMedia[]
+  history          RequestHistory[]
+  followers        RequestFollower[]
+  workOrders       WorkOrder[]
+  aiAnalyses       AIAnalysis[]
+  duplicateMatches DuplicateMatch[]  @relation("DuplicateSource")
+  duplicateOf      DuplicateMatch[]  @relation("DuplicateTarget")
+  comments         Comment[]
+
+  @@index([municipalityId, status])
+  @@index([status])
+  @@index([priority])
+  @@index([categoryId])
+  @@index([departmentId])
+  @@index([neighborhoodId])
+  @@index([createdAt])
+  @@index([slaDueAt])
+  @@index([createdById])
+  @@index([location], type: Gist)
+  // Trigram indexes: fuzzy search (number/address/description) and duplicate text similarity.
+  @@index([description(ops: raw("gin_trgm_ops"))], type: Gin, map: "requests_description_trgm_idx")
+  @@index([address(ops: raw("gin_trgm_ops"))], type: Gin, map: "requests_address_trgm_idx")
+  @@map("requests")
+}
+
+/// Citizens who chose "join existing request" on a duplicate warning.
+model RequestFollower {
+  requestId String   @map("request_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  request Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([requestId, userId])
+  @@index([userId])
+  @@map("request_followers")
+}
+
+model RequestMedia {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  requestId    String    @map("request_id") @db.Uuid
+  /// Server-generated object key (UUID-based); the client filename is never trusted.
+  storageKey   String    @unique @map("storage_key") @db.VarChar(300)
+  /// Optional public/CDN URL. Private media is served through presigned URLs instead.
+  url          String?   @db.VarChar(1000)
+  mediaType    MediaKind @default(IMAGE) @map("media_type")
+  mimeType     String    @map("mime_type") @db.VarChar(80)
+  sizeBytes    Int       @map("size_bytes")
+  uploadedById String?   @map("uploaded_by_id") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  request    Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  uploadedBy User?   @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([requestId])
+  @@map("request_media")
+}
+
+/// Append-only timeline of a request. Feeds the status timeline UI.
+model RequestHistory {
+  id            String           @id @default(uuid(7)) @db.Uuid
+  requestId     String           @map("request_id") @db.Uuid
+  eventType     RequestEventType @map("event_type")
+  oldStatus     RequestStatus?   @map("old_status")
+  newStatus     RequestStatus?   @map("new_status")
+  description   String           @db.VarChar(500)
+  metadata      Json?
+  performedById String?          @map("performed_by_id") @db.Uuid
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  request     Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  performedBy User?   @relation(fields: [performedById], references: [id], onDelete: SetNull)
+
+  @@index([requestId, createdAt])
+  @@map("request_history")
+}
+
+// ═════════════════════════════════ Field operations ══════════════════════════
+
+model FieldTeam {
+  id             String       @id @default(uuid(7)) @db.Uuid
+  municipalityId String       @map("municipality_id") @db.Uuid
+  departmentId   String       @map("department_id") @db.Uuid
+  leaderId       String?      @map("leader_id") @db.Uuid
+  name           String       @db.VarChar(120)
+  code           String       @db.VarChar(40)
+  status         RecordStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  municipality Municipality          @relation(fields: [municipalityId], references: [id], onDelete: Restrict)
+  department   Department            @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  leader       User?                 @relation("FieldTeamLeader", fields: [leaderId], references: [id], onDelete: SetNull)
+  members      FieldTeamMember[]
+  workOrders   WorkOrder[]
+  assignments  WorkOrderAssignment[]
+
+  @@unique([municipalityId, code])
+  @@index([departmentId])
+  @@map("field_teams")
+}
+
+model FieldTeamMember {
+  id       String              @id @default(uuid(7)) @db.Uuid
+  teamId   String              @map("team_id") @db.Uuid
+  userId   String              @map("user_id") @db.Uuid
+  role     FieldTeamMemberRole @default(MEMBER)
+  joinedAt DateTime            @default(now()) @map("joined_at") @db.Timestamptz(3)
+  leftAt   DateTime?           @map("left_at") @db.Timestamptz(3)
+
+  team FieldTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([userId])
+  @@map("field_team_members")
+}
+
+model WorkOrder {
+  id                    String          @id @default(uuid(7)) @db.Uuid
+  municipalityId        String          @map("municipality_id") @db.Uuid
+  /// Human-readable number, e.g. WO-2026-000001.
+  publicNumber          String          @unique @map("public_number") @db.VarChar(32)
+  requestId             String?         @map("request_id") @db.Uuid
+  departmentId          String          @map("department_id") @db.Uuid
+  /// Current assignee (denormalised from the active WorkOrderAssignment for fast lookups).
+  fieldTeamId           String?         @map("field_team_id") @db.Uuid
+  assignedUserId        String?         @map("assigned_user_id") @db.Uuid
+  createdById           String?         @map("created_by_id") @db.Uuid
+  title                 String          @db.VarChar(200)
+  description           String?         @db.Text
+  priority              Priority        @default(NORMAL)
+  status                WorkOrderStatus @default(CREATED)
+  latitude              Float
+  longitude             Float
+  location              Unsupported("geometry(Point, 4326)")?
+  address               String?         @db.VarChar(500)
+  slaDueAt              DateTime?       @map("sla_due_at") @db.Timestamptz(3)
+  plannedAt             DateTime?       @map("planned_at") @db.Timestamptz(3)
+  acceptedAt            DateTime?       @map("accepted_at") @db.Timestamptz(3)
+  enRouteAt             DateTime?       @map("en_route_at") @db.Timestamptz(3)
+  arrivedAt             DateTime?       @map("arrived_at") @db.Timestamptz(3)
+  startedAt             DateTime?       @map("started_at") @db.Timestamptz(3)
+  completedAt           DateTime?       @map("completed_at") @db.Timestamptz(3)
+  verifiedAt            DateTime?       @map("verified_at") @db.Timestamptz(3)
+  cancelledAt           DateTime?       @map("cancelled_at") @db.Timestamptz(3)
+  completionDescription String?         @map("completion_description") @db.Text
+  cancellationReason    String?         @map("cancellation_reason") @db.Text
+  createdAt             DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  municipality Municipality          @relation(fields: [municipalityId], references: [id], onDelete: Restrict)
+  request      Request?              @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  department   Department            @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  fieldTeam    FieldTeam?            @relation(fields: [fieldTeamId], references: [id], onDelete: SetNull)
+  assignedUser User?                 @relation("WorkOrderAssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  createdBy    User?                 @relation("WorkOrderCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  assignments  WorkOrderAssignment[]
+  media        WorkOrderMedia[]
+  history      WorkOrderHistory[]
+  comments     Comment[]
+
+  @@index([municipalityId, status])
+  @@index([status])
+  @@index([assignedUserId, status])
+  @@index([fieldTeamId])
+  @@index([departmentId])
+  @@index([requestId])
+  @@index([createdAt])
+  @@index([location], type: Gist)
+  @@map("work_orders")
+}
+
+/// Full assignment history – a reassignment closes the previous row (unassignedAt)
+/// instead of overwriting it, so "who had this job when" is never lost.
+model WorkOrderAssignment {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  workOrderId    String    @map("work_order_id") @db.Uuid
+  fieldTeamId    String?   @map("field_team_id") @db.Uuid
+  assigneeId     String?   @map("assignee_id") @db.Uuid
+  assignedById   String?   @map("assigned_by_id") @db.Uuid
+  note           String?   @db.VarChar(500)
+  assignedAt     DateTime  @default(now()) @map("assigned_at") @db.Timestamptz(3)
+  unassignedAt   DateTime? @map("unassigned_at") @db.Timestamptz(3)
+
+  workOrder  WorkOrder  @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  fieldTeam  FieldTeam? @relation(fields: [fieldTeamId], references: [id], onDelete: SetNull)
+  assignee   User?      @relation("AssignmentAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  assignedBy User?      @relation("AssignmentAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  @@index([workOrderId, assignedAt])
+  @@index([assigneeId])
+  @@map("work_order_assignments")
+}
+
+/// Before / during / after evidence photos.
+model WorkOrderMedia {
+  id           String             @id @default(uuid(7)) @db.Uuid
+  workOrderId  String             @map("work_order_id") @db.Uuid
+  type         WorkOrderMediaType
+  storageKey   String             @unique @map("storage_key") @db.VarChar(300)
+  url          String?            @db.VarChar(1000)
+  mimeType     String             @map("mime_type") @db.VarChar(80)
+  sizeBytes    Int                @map("size_bytes")
+  /// Where the photo was taken (device GPS), used as field evidence.
+  latitude     Float?
+  longitude    Float?
+  capturedAt   DateTime?          @map("captured_at") @db.Timestamptz(3)
+  uploadedById String?            @map("uploaded_by_id") @db.Uuid
+  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  workOrder  WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  uploadedBy User?     @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([workOrderId, type])
+  @@map("work_order_media")
+}
+
+model WorkOrderHistory {
+  id            String             @id @default(uuid(7)) @db.Uuid
+  workOrderId   String             @map("work_order_id") @db.Uuid
+  eventType     WorkOrderEventType @map("event_type")
+  oldStatus     WorkOrderStatus?   @map("old_status")
+  newStatus     WorkOrderStatus?   @map("new_status")
+  description   String             @db.VarChar(500)
+  metadata      Json?
+  /// Actor position at the time of the event (if the device shared it).
+  latitude      Float?
+  longitude     Float?
+  performedById String?            @map("performed_by_id") @db.Uuid
+  createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  performedBy User?     @relation(fields: [performedById], references: [id], onDelete: SetNull)
+
+  @@index([workOrderId, createdAt])
+  @@map("work_order_history")
+}
+
+// ═════════════════════════════════ Collaboration ═════════════════════════════
+
+/// A comment belongs to exactly one of request / work order (enforced by a CHECK constraint).
+model Comment {
+  id          String            @id @default(uuid(7)) @db.Uuid
+  requestId   String?           @map("request_id") @db.Uuid
+  workOrderId String?           @map("work_order_id") @db.Uuid
+  authorId    String?           @map("author_id") @db.Uuid
+  body        String            @db.Text
+  visibility  CommentVisibility @default(INTERNAL)
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  request   Request?   @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  workOrder WorkOrder? @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  author    User?      @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([requestId, createdAt])
+  @@index([workOrderId, createdAt])
+  @@map("comments")
+}
+
+model Notification {
+  id             String              @id @default(uuid(7)) @db.Uuid
+  municipalityId String              @map("municipality_id") @db.Uuid
+  userId         String              @map("user_id") @db.Uuid
+  type           NotificationType
+  channel        NotificationChannel @default(IN_APP)
+  title          String              @db.VarChar(200)
+  body           String              @db.VarChar(1000)
+  /// Deep-link target, e.g. entityType = "WorkOrder", entityId = <uuid>.
+  entityType     String?             @map("entity_type") @db.VarChar(60)
+  entityId       String?             @map("entity_id") @db.Uuid
+  readAt         DateTime?           @map("read_at") @db.Timestamptz(3)
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  municipality Municipality @relation(fields: [municipalityId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+  @@map("notifications")
+}
+
+// ═════════════════════════════════ AI & duplicate detection ══════════════════
+
+/// Stored AI suggestion. AI never decides: the accepted flag records whether a
+/// human kept the suggestion, which later measures classifier accuracy.
+model AIAnalysis {
+  id                    String     @id @default(uuid(7)) @db.Uuid
+  requestId             String     @map("request_id") @db.Uuid
+  provider              String     @db.VarChar(40)
+  model                 String     @db.VarChar(80)
+  suggestedCategoryId   String?    @map("suggested_category_id") @db.Uuid
+  suggestedDepartmentId String?    @map("suggested_department_id") @db.Uuid
+  prioritySuggestion    Priority?  @map("priority_suggestion")
+  riskLevel             RiskLevel? @map("risk_level")
+  /// Provider-neutral classification payload (category/subCategory codes, signals).
+  classification        Json
+  summary               String?    @db.VarChar(1000)
+  confidence            Float
+  /// Sanitised provider response – personal data is stripped before persisting.
+  rawResponse           Json?      @map("raw_response")
+  latencyMs             Int?       @map("latency_ms")
+  accepted              Boolean?
+  createdAt             DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  request             Request          @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  suggestedCategory   RequestCategory? @relation("AISuggestedCategory", fields: [suggestedCategoryId], references: [id], onDelete: SetNull)
+  suggestedDepartment Department?      @relation("AISuggestedDepartment", fields: [suggestedDepartmentId], references: [id], onDelete: SetNull)
+
+  @@index([requestId])
+  @@map("ai_analyses")
+}
+
+/// Explainable duplicate score: every component is persisted, not just the total.
+model DuplicateMatch {
+  id               String               @id @default(uuid(7)) @db.Uuid
+  requestId        String               @map("request_id") @db.Uuid
+  matchedRequestId String               @map("matched_request_id") @db.Uuid
+  score            Float
+  distanceMeters   Float                @map("distance_meters")
+  distanceScore    Float                @map("distance_score")
+  categoryScore    Float                @map("category_score")
+  timeScore        Float                @map("time_score")
+  textScore        Float                @map("text_score")
+  status           DuplicateMatchStatus @default(SUGGESTED)
+  decidedById      String?              @map("decided_by_id") @db.Uuid
+  decidedAt        DateTime?            @map("decided_at") @db.Timestamptz(3)
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  request        Request @relation("DuplicateSource", fields: [requestId], references: [id], onDelete: Cascade)
+  matchedRequest Request @relation("DuplicateTarget", fields: [matchedRequestId], references: [id], onDelete: Cascade)
+  decidedBy      User?   @relation(fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@unique([requestId, matchedRequestId])
+  @@index([matchedRequestId])
+  @@map("duplicate_matches")
+}
+
+// ═════════════════════════════════ Platform ══════════════════════════════════
+
+/// Immutable audit trail. UPDATE/DELETE are rejected by a DB trigger.
+model AuditLog {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  municipalityId String?  @map("municipality_id") @db.Uuid
+  userId         String?  @map("user_id") @db.Uuid
+  action         String   @db.VarChar(80)
+  entityType     String   @map("entity_type") @db.VarChar(60)
+  entityId       String?  @map("entity_id") @db.VarChar(64)
+  beforeData     Json?    @map("before_data")
+  afterData      Json?    @map("after_data")
+  ipAddress      String?  @map("ip_address") @db.VarChar(64)
+  userAgent      String?  @map("user_agent") @db.VarChar(500)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  municipality Municipality? @relation(fields: [municipalityId], references: [id], onDelete: SetNull)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([municipalityId, createdAt])
+  @@index([entityType, entityId])
+  @@index([userId, createdAt])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+/// Race-free yearly counters for public numbers (KNT-2026-000001, WO-2026-000001).
+/// Incremented with a single atomic INSERT … ON CONFLICT … DO UPDATE … RETURNING.
+model NumberSequence {
+  municipalityId String        @map("municipality_id") @db.Uuid
+  scope          SequenceScope
+  year           Int
+  lastValue      Int           @default(0) @map("last_value")
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  municipality Municipality @relation(fields: [municipalityId], references: [id], onDelete: Cascade)
+
+  @@id([municipalityId, scope, year])
+  @@map("number_sequences")
+}

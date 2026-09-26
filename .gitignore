@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# Prisma generated client
+apps/api/src/generated/
+
+# Expo
+.expo/
+apps/mobile/android/
+apps/mobile/ios/
+
+# Test / coverage
+coverage/
+.nyc_output/
+
+# Uploads & logs
+uploads/
+logs/
+*.log
+npm-debug.log*
+
+# IDE / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

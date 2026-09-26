@@ -1,0 +1,19 @@
+{
+  "name": "@kent360/shared-types",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Domain enums, permission catalogue and API contract types shared across KENT360 apps",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@kent360/config": "0.1.0",
+    "typescript": "~5.9.3"
+  }
+}

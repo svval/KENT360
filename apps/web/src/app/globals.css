@@ -1,0 +1,87 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+/*
+ * KENT360 design tokens (see docs/UI_UX_GUIDE.md).
+ * Tenant branding overrides --brand-primary / --brand-accent at runtime; every
+ * other colour is fixed to preserve contrast and semantic meaning.
+ */
+:root {
+  --brand-primary: #2563eb;
+  --brand-accent: #0891b2;
+}
+
+@theme inline {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  --color-navy: #0b1f3a;
+  --color-navy-800: #12294a;
+  --color-navy-700: #1b365c;
+  --color-primary: var(--brand-primary);
+  --color-primary-hover: color-mix(in srgb, var(--brand-primary) 88%, black);
+  --color-primary-soft: color-mix(in srgb, var(--brand-primary) 10%, white);
+  --color-accent: var(--brand-accent);
+  --color-accent-soft: color-mix(in srgb, var(--brand-accent) 10%, white);
+
+  --color-background: #f5f7fa;
+  --color-card: #ffffff;
+  --color-foreground: #172033;
+  --color-muted: #64748b;
+  --color-subtle: #f1f5f9;
+  --color-border: #e2e8f0;
+  --color-border-strong: #cbd5e1;
+
+  --color-success: #16a34a;
+  --color-success-soft: #dcfce7;
+  --color-warning: #f59e0b;
+  --color-warning-strong: #b45309;
+  --color-warning-soft: #fef3c7;
+  --color-critical: #dc2626;
+  --color-critical-soft: #fee2e2;
+  --color-info-soft: #dbeafe;
+
+  --radius-card: 12px;
+  --radius-control: 8px;
+
+  --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.04);
+  --shadow-popover: 0 8px 24px -6px rgb(15 23 42 / 0.16);
+
+  --spacing-sidebar: 248px;
+  --spacing-sidebar-collapsed: 72px;
+  --spacing-topbar: 64px;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans text-sm;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+
+  *,
+  ::before,
+  ::after {
+    @apply border-border;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-primary;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
