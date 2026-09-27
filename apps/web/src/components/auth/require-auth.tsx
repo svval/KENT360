@@ -3,7 +3,7 @@
 import { ShieldAlert } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { type ReactNode, useEffect } from 'react';
-import { findNavItem } from '@/components/layout/navigation';
+import { canAccessNavItem, findNavItem } from '@/components/layout/navigation';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -47,9 +47,9 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 export function RoutePermissionGate({ children }: { children: ReactNode }) {
   const { hasPermission } = useAuth();
   const pathname = usePathname();
-  const required = findNavItem(pathname)?.permission;
+  const item = findNavItem(pathname);
 
-  if (required && !hasPermission(required)) {
+  if (item && !canAccessNavItem(item, hasPermission)) {
     return (
       <Card>
         <EmptyState

@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/providers/auth-provider';
 import { useBranding } from '@/providers/branding-provider';
-import { navigation } from './navigation';
+import { canAccessNavItem, navigation } from './navigation';
 
 interface SidebarProps {
   collapsed: boolean;
@@ -23,7 +23,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onNavigate }: Sidebar
   const sections = navigation
     .map((section) => ({
       ...section,
-      items: section.items.filter((item) => !item.permission || hasPermission(item.permission)),
+      items: section.items.filter((item) => canAccessNavItem(item, hasPermission)),
     }))
     .filter((section) => section.items.length > 0);
 

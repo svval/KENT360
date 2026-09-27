@@ -1,19 +1,14 @@
 import type { Metadata } from 'next';
-import { ModulePlaceholder } from '@/components/layout/module-placeholder';
+import { Suspense } from 'react';
+import { RequestsView } from './requests-view';
 
 export const metadata: Metadata = { title: 'Talepler' };
 
 export default function RequestsPage() {
+  // Filters live in the URL (useSearchParams) – needs a Suspense boundary.
   return (
-    <ModulePlaceholder
-      href="/requests"
-      phase="Phase 5 · Phase 8"
-      capabilities={[
-        'Filtrelenebilir, sıralanabilir talep tablosu (URL state)',
-        'Durum, öncelik, müdürlük, mahalle ve tarih filtreleri',
-        'SLA durumu: zamanında, riskte, aşıldı',
-        'Talep detayı, zaman çizelgesi ve AI analizi',
-      ]}
-    />
+    <Suspense>
+      <RequestsView />
+    </Suspense>
   );
 }

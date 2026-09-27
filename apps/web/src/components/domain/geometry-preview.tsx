@@ -8,10 +8,12 @@ interface GeometryPreviewProps {
   collection: NeighborhoodFeatureCollection;
   highlightId?: string | null;
   onSelect?: (id: string) => void;
+  /** A point (e.g. a request location) drawn on top; the view grows to include it. */
+  marker?: { latitude: number; longitude: number } | null;
   className?: string;
 }
 
-const PADDING = 8;
+const PADDING = 12;
 const WIDTH = 400;
 
 /**
@@ -23,10 +25,12 @@ export function GeometryPreview({
   collection,
   highlightId,
   onSelect,
+  marker,
   className,
 }: GeometryPreviewProps) {
   const shapes = useMemo(() => {
     const points: Position[] = collection.features.flatMap((f) => f.geometry.coordinates.flat(2));
+    if (marker) points.push([marker.longitude, marker.latitude]);
     if (points.length === 0) return null;
     const lngs = points.map((p) => p[0]);
     const lats = points.map((p) => p[1]);
@@ -37,16 +41,18 @@ export function GeometryPreview({
       Math.max(...lats),
     ];
     const kx = Math.cos((((minLat + maxLat) / 2) * Math.PI) / 180);
-    const spanX = Math.max((maxLng - minLng) * kx, 1e-9);
-    const spanY = Math.max(maxLat - minLat, 1e-9);
+    const spanX = Math.max((maxLng - minLng) * kx, 1e-4);
+    const spanY = Math.max(maxLat - minLat, 1e-4);
     const scale = (WIDTH - PADDING * 2) / spanX;
     const height = Math.min(Math.max(spanY * scale + PADDING * 2, 120), 480);
     const yScale = Math.min(scale, (height - PADDING * 2) / spanY);
-    const project = ([lng, lat]: Position) =>
-      `${(PADDING + (lng - minLng) * kx * yScale).toFixed(1)},${(height - PADDING - (lat - minLat) * yScale).toFixed(1)}`;
+    const x = (lng: number) => PADDING + (lng - minLng) * kx * yScale;
+    const y = (lat: number) => height - PADDING - (lat - minLat) * yScale;
+    const project = ([lng, lat]: Position) => `${x(lng).toFixed(1)},${y(lat).toFixed(1)}`;
 
     return {
       height,
+      marker: marker ? { cx: x(marker.longitude), cy: y(marker.latitude) } : null,
       items: collection.features.map((f) => ({
         id: f.properties.id,
         name: f.properties.name,
@@ -55,7 +61,7 @@ export function GeometryPreview({
           .join(''),
       })),
     };
-  }, [collection]);
+  }, [collection, marker]);
 
   if (!shapes) return null;
 
@@ -64,7 +70,11 @@ export function GeometryPreview({
       viewBox={`0 0 ${WIDTH} ${shapes.height.toFixed(0)}`}
       className={cn('h-auto w-full rounded-lg bg-subtle', className)}
       role="img"
-      aria-label={`Mahalle sınırları önizlemesi: ${shapes.items.length} mahalle`}
+      aria-label={
+        marker
+          ? `Konum önizlemesi: seçilen nokta ve ${shapes.items.length} mahalle sınırı`
+          : `Mahalle sınırları önizlemesi: ${shapes.items.length} mahalle`
+      }
     >
       {shapes.items.map((item) => {
         const active = item.id === highlightId;
@@ -84,6 +94,17 @@ export function GeometryPreview({
           </path>
         );
       })}
+      {shapes.marker && (
+        <g aria-hidden="true">
+          <circle cx={shapes.marker.cx} cy={shapes.marker.cy} r={9} className="fill-critical/20" />
+          <circle
+            cx={shapes.marker.cx}
+            cy={shapes.marker.cy}
+            r={4.5}
+            className="fill-critical stroke-white stroke-2"
+          />
+        </g>
+      )}
     </svg>
   );
 }

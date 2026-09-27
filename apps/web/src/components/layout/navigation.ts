@@ -25,8 +25,11 @@ export interface NavItem {
   /** Page subtitle shown under the title. */
   description: string;
   icon: LucideIcon;
-  /** Required permission; items are hidden (not just disabled) without it and the page is gated. */
-  permission?: Permission;
+  /**
+   * Required permission – a list means "any of". Items are hidden (not just disabled)
+   * without it and the page is gated. The API enforces the same rules.
+   */
+  permission?: Permission | readonly Permission[];
 }
 
 export interface NavSection {
@@ -58,7 +61,8 @@ export const navigation: NavSection[] = [
         label: 'Talepler',
         description: 'Belediyeye iletilen vatandaş ve kurum taleplerini yönetin.',
         icon: Inbox,
-        permission: Permission.REQUESTS_READ,
+        // Citizens see their own requests here (requests.readOwn).
+        permission: [Permission.REQUESTS_READ, Permission.REQUESTS_READ_OWN],
       },
       {
         href: '/work-orders',
@@ -167,6 +171,17 @@ export const navigation: NavSection[] = [
 ];
 
 const allItems = navigation.flatMap((section) => section.items);
+
+export function canAccessNavItem(
+  item: Pick<NavItem, 'permission'>,
+  hasPermission: (permission: Permission) => boolean,
+): boolean {
+  if (!item.permission) return true;
+  const required = Array.isArray(item.permission)
+    ? item.permission
+    : [item.permission as Permission];
+  return required.some((permission) => hasPermission(permission));
+}
 
 /** Longest-prefix match so /requests/123 resolves to "Talepler". */
 export function findNavItem(pathname: string): NavItem | undefined {

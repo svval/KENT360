@@ -5,6 +5,7 @@ import {
   type NeighborhoodDetail,
   type NeighborhoodFeatureCollection,
   type NeighborhoodImportResult,
+  type NeighborhoodResolution,
   type NeighborhoodSummary,
   type Priority,
   type RecordStatus,
@@ -178,6 +179,17 @@ export async function importNeighborhoods(
     await apiFetch<ApiSuccess<NeighborhoodImportResult>>(
       `/api/v1/neighborhoods/import${dryRun ? '?dryRun=true' : ''}`,
       json('POST', collection),
+    )
+  ).data;
+}
+
+export async function resolveNeighborhood(
+  latitude: number,
+  longitude: number,
+): Promise<NeighborhoodResolution | null> {
+  return (
+    await apiFetch<ApiSuccess<NeighborhoodResolution | null>>(
+      `/api/v1/neighborhoods/resolve?lat=${latitude}&lng=${longitude}`,
     )
   ).data;
 }
