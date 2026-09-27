@@ -1,12 +1,22 @@
 import { randomUUID } from 'node:crypto';
 import { AuditAction, RoleCode } from '@kent360/shared-types';
+import sharp from 'sharp';
 import { NumberingService } from '../src/modules/numbering/numbering.service';
+import {
+  animatedWebp,
+  corruptJpeg,
+  hugeDimensionPng,
+  jpegWithMetadata,
+  metadataTraces,
+  plainImage,
+  pngWithMetadata,
+  webpWithMetadata,
+} from './support/images';
 import {
   addUser,
   bearer,
   createTenant,
   createTestApp,
-  IMAGES,
   login,
   type TenantFixture,
   type TestApp,
@@ -730,9 +740,17 @@ describe('Requests (e2e)', () => {
       return req;
     };
 
-    it('stores JPEG, PNG and WEBP privately under server-generated keys', async () => {
+    const IMAGES = {} as Record<'jpeg' | 'png' | 'webp' | 'exifJpeg', Buffer>;
+    beforeAll(async () => {
+      IMAGES.jpeg = await plainImage('jpeg');
+      IMAGES.png = await pngWithMetadata();
+      IMAGES.webp = await webpWithMetadata();
+      IMAGES.exifJpeg = await jpegWithMetadata();
+    });
+
+    it('stores JPEG, PNG and WEBP privately under server-generated keys, without metadata', async () => {
       const res = await upload('citizen', [
-        { buffer: IMAGES.jpeg, name: '../../etc/passwd.jpg', type: 'image/jpeg' },
+        { buffer: IMAGES.exifJpeg, name: '../../etc/passwd.jpg', type: 'image/jpeg' },
         { buffer: IMAGES.png, name: 'foto.png', type: 'image/png' },
         { buffer: IMAGES.webp, name: 'x.webp', type: 'image/webp' },
       ]).expect(201);
@@ -757,11 +775,23 @@ describe('Requests (e2e)', () => {
       }
 
       // The presigned URL works; the same object without a signature is refused (private bucket).
+      for (const [i, media] of (res.body.data as { url: string; mimeType: string }[]).entries()) {
+        const ok = await fetch(media.url);
+        expect(ok.status).toBe(200);
+        expect(ok.headers.get('content-type')).toBe(media.mimeType);
+        const stored = Buffer.from(await ok.arrayBuffer());
+        // What is stored is the re-encoded image: decodable, same format, no EXIF/GPS/XMP.
+        expect(stored.length).toBe(rows[i].sizeBytes);
+        expect((await sharp(stored).metadata()).format).toBe(media.mimeType.split('/')[1]);
+        expect(await metadataTraces(stored)).toEqual([]);
+      }
       const signed = res.body.data[0].url as string;
-      const ok = await fetch(signed);
-      expect(ok.status).toBe(200);
-      expect(ok.headers.get('content-type')).toBe('image/jpeg');
-      expect(Buffer.from(await ok.arrayBuffer()).equals(IMAGES.jpeg)).toBe(true);
+      expect(new URL(signed).pathname.startsWith('/kent360-media-test/')).toBe(true);
+      // EXIF Orientation 6 was applied to the pixels: 40×20 stored → 20×40 upright.
+      const upright = await sharp(
+        Buffer.from(await (await fetch(signed)).arrayBuffer()),
+      ).metadata();
+      expect([upright.width, upright.height]).toEqual([20, 40]);
       expect((await fetch(signed.split('?')[0])).status).toBe(403);
       expect(Date.parse(res.body.data[0].urlExpiresAt) - Date.now()).toBeLessThanOrEqual(300_000);
 
@@ -779,19 +809,41 @@ describe('Requests (e2e)', () => {
     });
 
     it('decides the type by file signature, not by name or declared type', async () => {
+      const gifBytes = Buffer.concat([Buffer.from('GIF89a'), Buffer.alloc(64, 4)]);
       const gif = await upload('citizen', [
-        { buffer: IMAGES.gif, name: 'a.gif', type: 'image/gif' },
+        { buffer: gifBytes, name: 'a.gif', type: 'image/gif' },
       ]).expect(415);
       expect(gif.body.code).toBe('UNSUPPORTED_MEDIA_TYPE');
-      await upload('citizen', [
-        { buffer: IMAGES.gif, name: 'spoof.jpg', type: 'image/jpeg' },
-      ]).expect(415);
+      await upload('citizen', [{ buffer: gifBytes, name: 'spoof.jpg', type: 'image/jpeg' }]).expect(
+        415,
+      );
       await upload('citizen', [
         { buffer: IMAGES.png, name: 'mismatch.jpg', type: 'image/jpeg' },
       ]).expect(415);
       await upload('citizen', [
         { buffer: Buffer.from('<script>alert(1)</script>'), name: 'x.png', type: 'image/png' },
       ]).expect(415);
+    });
+
+    it('rejects corrupt, animated and oversized-dimension images before storing anything', async () => {
+      const corrupt = await upload('citizen', [
+        { buffer: await corruptJpeg(), name: 'broken.jpg', type: 'image/jpeg' },
+      ]).expect(400);
+      expect(corrupt.body.code).toBe('INVALID_IMAGE');
+      const animated = await upload('citizen', [
+        { buffer: await animatedWebp(), name: 'anim.webp', type: 'image/webp' },
+      ]).expect(415);
+      expect(animated.body.code).toBe('UNSUPPORTED_MEDIA_TYPE');
+      // A valid first file does not get stored when a later one fails.
+      const huge = await upload('citizen', [
+        { buffer: IMAGES.jpeg, name: 'ok.jpg', type: 'image/jpeg' },
+        { buffer: hugeDimensionPng(), name: 'bomb.png', type: 'image/png' },
+      ]).expect(413);
+      expect(huge.body).toMatchObject({
+        code: 'IMAGE_DIMENSIONS_TOO_LARGE',
+        details: { index: 1, width: 20_000, height: 20_000 },
+      });
+      expect(await t.prisma.requestMedia.count({ where: { requestId: id } })).toBe(3);
     });
 
     it('rejects oversized files and more than five photos per request', async () => {

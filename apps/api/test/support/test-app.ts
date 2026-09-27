@@ -135,26 +135,3 @@ export async function addUser(
   });
   return { id: user.id, email };
 }
-
-/**
- * Minimal files whose first bytes carry the real format signatures (the API decides by
- * signature, not by name or declared type).
- */
-export const IMAGES = {
-  jpeg: Buffer.concat([
-    Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]),
-    Buffer.from('JFIF\0'),
-    Buffer.alloc(64, 1),
-  ]),
-  png: Buffer.concat([
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    Buffer.alloc(64, 2),
-  ]),
-  webp: Buffer.concat([
-    Buffer.from('RIFF'),
-    Buffer.from([0x40, 0, 0, 0]),
-    Buffer.from('WEBPVP8 '),
-    Buffer.alloc(64, 3),
-  ]),
-  gif: Buffer.concat([Buffer.from('GIF89a'), Buffer.alloc(64, 4)]),
-};

@@ -2,6 +2,8 @@ import path from 'node:path';
 import { config as loadEnv } from 'dotenv';
 
 export const TEST_DATABASE_NAME = 'kent360_test';
+/** e2e uploads go to their own private bucket, never into the development media bucket. */
+export const TEST_BUCKET_NAME = 'kent360-media-test';
 
 /**
  * e2e tests never touch the development database: audit_logs is append-only, so data

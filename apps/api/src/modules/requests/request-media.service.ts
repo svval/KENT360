@@ -8,7 +8,8 @@ import { type RequestMeta } from '../../common/utils/request-meta';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { StorageService } from '../storage/storage.service';
-import { declaredTypeMatches, detectImageKind, type ImageKind } from './domain/image-signature';
+import { type ImageKind } from '../storage/image-signature';
+import { normalizeImage } from '../storage/image-normalizer';
 import { RequestsService } from './requests.service';
 
 /** What multer hands over (memory storage). The client's `originalname` is never used. */
@@ -42,7 +43,8 @@ export class RequestMediaService {
   ) {}
 
   /**
-   * Validates every file (signature + declared type + size), stores them in the private
+   * Validates and normalises every file (signature, size, dimensions, decode, re-encode
+   * without metadata – see image-normalizer.ts), stores them in the private
    * bucket, then records them with the timeline entry and audit record in one
    * transaction. If that transaction fails, the uploaded objects are removed again.
    */
@@ -80,16 +82,9 @@ export class RequestMediaService {
       );
     }
 
-    const verified = files.map((file, index) => {
-      const kind = detectImageKind(file.buffer.subarray(0, 16));
-      if (!kind || !declaredTypeMatches(file.mimetype, kind)) {
-        throw new AppException(
-          ErrorCode.UNSUPPORTED_MEDIA_TYPE,
-          'Yalnızca JPEG, PNG veya WEBP fotoğraf yüklenebilir.',
-          HttpStatus.UNSUPPORTED_MEDIA_TYPE,
-          { index },
-        );
-      }
+    // Every file is validated and re-encoded before anything is stored (no metadata kept).
+    const verified: { image: Awaited<ReturnType<typeof normalizeImage>>; key: string }[] = [];
+    for (const [index, file] of files.entries()) {
       if (
         file.size > REQUEST_MEDIA_LIMITS.maxBytes ||
         file.buffer.length > REQUEST_MEDIA_LIMITS.maxBytes
@@ -101,13 +96,14 @@ export class RequestMediaService {
           { index },
         );
       }
-      return { file, kind, key: mediaObjectKey(actor.municipalityId, requestId, kind) };
-    });
+      const image = await normalizeImage(file.buffer, file.mimetype, index);
+      verified.push({ image, key: mediaObjectKey(actor.municipalityId, requestId, image.kind) });
+    }
 
     const stored: string[] = [];
     try {
       for (const item of verified) {
-        await this.storage.put(item.key, item.file.buffer, item.kind.mimeType);
+        await this.storage.put(item.key, item.image.buffer, item.image.kind.mimeType);
         stored.push(item.key);
       }
       const now = new Date();
@@ -116,8 +112,8 @@ export class RequestMediaService {
           data: verified.map((item) => ({
             requestId,
             storageKey: item.key,
-            mimeType: item.kind.mimeType,
-            sizeBytes: item.file.buffer.length,
+            mimeType: item.image.kind.mimeType,
+            sizeBytes: item.image.buffer.length,
             uploadedById: actor.id,
             createdAt: now,
           })),
