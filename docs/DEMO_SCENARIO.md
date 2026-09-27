@@ -21,13 +21,13 @@ Seed mahalleleri: Karataş, Akkent, Güneykent, Dumlupınar, Binevler – **isim
 
 ## Hazır Kayıtlar
 
-| Kayıt            | Değer                                                                                                     |
-| ---------------- | --------------------------------------------------------------------------------------------------------- |
-| Hikâye talebi    | `KNT-2026-001248` – Karataş Mahallesi, yol çukuru                                                         |
-| Hikâye iş emri   | `WO-2026-000883` – Fen İşleri – Ekip 1, Ahmet Kaya                                                        |
-| AI önerisi       | Kategori: Yol ve Kaldırım / Yol Çukuru · Müdürlük: Fen İşleri · Öncelik: Yüksek · Risk: Orta · Güven: %94 |
-| Duplicate örneği | Karataş'ta 55 m uzakta, 3 saat önce açılmış benzer çukur talebi (skor ≈ 0.84)                             |
-| Arka plan verisi | 150+ talep (son 90 gün), 40+ iş emri, kritik ve SLA'sı riskte kayıtlar                                    |
+| Kayıt            | Değer                                                                                                                                         |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hikâye talebi    | `KNT-2026-001248` – Karataş Mahallesi, yol çukuru                                                                                             |
+| Hikâye iş emri   | `WO-2026-000883` – Fen İşleri – Ekip 1, Ahmet Kaya                                                                                            |
+| AI önerisi       | Kategori: Yol ve Kaldırım / Yol Çukuru · Müdürlük: Fen İşleri · Öncelik: Yüksek · Risk: Orta · Güven: %94                                     |
+| Duplicate örneği | Karataş'ta 55 m uzakta, 3 saat önce açılmış benzer çukur talebi (skor ≈ 0.84)                                                                 |
+| Arka plan verisi | 120 demo talep (Phase 5 ✅: son 90 gün, tüm kategoriler, SLA içinde / riskte / aşılmış, vatandaş hesabının 8 talebi); 40+ iş emri Phase 6 ile |
 
 ## Akış
 
@@ -75,3 +75,13 @@ Seed mahalleleri: Karataş, Akkent, Güneykent, Dumlupınar, Binevler – **isim
 - AI'nın **karar vermediğini**, öneri ürettiğini ve insan düzeltmelerinin kaydedildiğini vurgulayın.
 - Mükerrer tespitinin **açıklanabilir** olduğunu (mesafe/kategori/metin/zaman bileşenleri) gösterin.
 - Beyaz etiket: belediye adı, logo ve renklerin ayarlardan değiştiğini gösterin.
+
+## Phase 5 ile çalışan kısım
+
+Sahne 2'nin fotoğraf + konum + açıklama ile talep oluşturma bölümü (AI önerisi ve mükerrer uyarısı hariç) ve Sahne 3'ün "talep detayı, zaman çizelgesi, SLA, müdürlüğe atama" bölümü çalışır:
+
+1. `citizen@kent360.local` → **Talepler → Yeni Talep** → _Yol ve Kaldırım › Yol Çukuru_ (ilgili birim: Fen İşleri, hedef süre: 1 gün) → açıklama → **Demo konumu kullan** (Karataş) → fotoğraf → **Talebi gönder** → `KNT-2026-…` ve talep detayı.
+2. `manager@kent360.local` → **Talepler** (Fen İşleri kapsamı) → talep → **İncelemeye al** → **Müdürlüğe ata**; öncelik değişikliği; zaman çizelgesi güncellenir.
+3. `citizen@kent360.local` aynı talepte güncel durumu ve süreci görür (personel adları olmadan).
+
+Harita üzerinden nokta seçimi Phase 9'da, AI önerisi ve mükerrer uyarısı Phase 11'de, iş emri akışı Phase 6'da eklenecek.

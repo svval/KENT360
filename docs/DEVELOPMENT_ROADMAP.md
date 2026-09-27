@@ -11,7 +11,7 @@ Durum: ✅ tamamlandı · 🟡 kısmen · ⬜ planlandı
 | 2   | Backend temeli: config, validation, hata formatı, loglama, Swagger, health | ✅                               |
 | 3   | Kimlik doğrulama ve yetkilendirme                                          | ✅                               |
 | 4   | Belediye domain'i: belediye, müdürlük, mahalle, kategori + seed            | ✅                               |
-| 5   | Talep yönetimi: talepler, medya, history, workflow, SLA                    | ⬜                               |
+| 5   | Talep yönetimi: talepler, medya, history, workflow, SLA                    | ✅                               |
 | 6   | İş emirleri: ekipler, atama, workflow, önce/sonra                          | ⬜                               |
 | 7   | Web temeli: login, layout, sidebar, topbar, tasarım sistemi                | ✅                               |
 | 8   | Yönetim arayüzü: dashboard, talepler, talep detayı, iş emirleri            | ⬜                               |
@@ -69,13 +69,19 @@ Durum: ✅ tamamlandı · 🟡 kısmen · ⬜ planlandı
 - ✅ **Seed:** 5 müdürlük, 5 ana / 13 alt kategori, 5 mahalle (**demo geometri**, resmi sınır değil – DATABASE_DESIGN §9); 5 demo hesap (Phase 3). Daha büyük örnek veri Phase 5–6 ile.
 - ✅ **Testler:** unit (geometri doğrulama, kategori kuralları, SLA biçimi) + e2e (tenant izolasyonu, Polygon/MultiPolygon, geçersiz GeoJSON/PostGIS, resolve ve sınır davranışı, FeatureCollection, import rollback, hiyerarşi, SLA, RBAC, audit)
 
-## Phase 5 – Talep Yönetimi
+## Phase 5 – Talep Yönetimi ✅
 
-- Atomik numara üretimi, konumdan mahalle bulma (PostGIS), SLA hesaplama
-- Durum makinesi + geçiş uç noktası, history, audit
-- Medya yükleme (MinIO, MIME/magic byte doğrulama, presigned URL)
-- **Seed:** 150+ talep (son 90 gün, gerçekçi dağılım)
-- **Testler:** durum geçiş tablosu, SLA hesabı, numara formatı ve eşzamanlılık
+- ✅ Atomik, belediye + yıl bazlı numara (`KNT-2026-000001`), belediye içinde tekil
+- ✅ Talep oluşturma: yaprak kategori, müdürlük / öncelik / SLA snapshot, `ST_Covers` ile mahalle (bulunamazsa `NULL` + uyarı), kaynağı sunucu belirler
+- ✅ Durum makinesi (tam graf; Phase 5 elle geçişleri açık, AI / iş emri geçişleri ilgili fazlara ayrılmış), öncelik ve müdürlük değişikliği uçları
+- ✅ `request_history` zaman çizelgesi + audit, aynı transaction'da
+- ✅ Object scope: admin / müdürlük / kendi talepleri; kapsam dışı 404
+- ✅ Liste: sayfalama, izinli sıralama, durum/öncelik/kategori/müdürlük/mahalle/kaynak/tarih/SLA filtreleri, arama
+- ✅ Medya: imza doğrulamalı JPEG/PNG/WEBP, private MinIO, presigned URL
+- ✅ Web: `/requests` (URL filtreli tablo), `/requests/new` (kategori → açıklama → konum paneli → fotoğraf → kontrol), `/requests/[id]` (detay, SLA, işlemler, süreç)
+- ✅ **Seed:** 120 deterministik demo talep (son 90 gün)
+- ✅ **Testler:** unit (durum makinesi, SLA, dosya imzası, kapsam, yıl) + e2e (numara eşzamanlılığı / yıl / belediye, yönlendirme, SLA snapshot, kapsamlar, filtreler, iş akışı, geçmiş/audit, medya güvenliği)
+- ⏭ Harita üzerinden konum seçimi → Phase 9 (MapLibre); mükerrer tespiti ve AI → Phase 11; EXIF temizliği → teknik borç
 
 ## Phase 6 – İş Emirleri
 

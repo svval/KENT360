@@ -103,7 +103,7 @@ DO UPDATE SET last_value = number_sequences.last_value + 1, updated_at = now()
 RETURNING last_value;
 ```
 
-Bu ifade talebi oluşturan transaction içinde çalışır; transaction geri alınırsa numara da geri alınır (boşluk oluşmaz). Biçimlendirme saf fonksiyondur: `formatPublicNumber()` (`src/common/utils/public-number.ts`, birim testli). Yıl, belediyenin saat diliminde hesaplanır (31 Aralık 23:30 Türkiye saati → yeni yıl değil).
+Bu ifade talebi oluşturan transaction içinde çalışır; transaction geri alınırsa numara da geri alınır (boşluk oluşmaz). Sayaç belediye bazlı olduğundan numara **belediye içinde** tekildir: `UNIQUE (municipality_id, public_number)` (iki belediye de `KNT-2026-000001`'e sahip olabilir). Uygulama: `NumberingService` (`src/modules/numbering`), iş emirleri (Phase 6) aynı servisi kullanacak. Test: 25 eşzamanlı talep ardışık ve tekrarsız numara alır. Biçimlendirme saf fonksiyondur: `formatPublicNumber()` (`src/common/utils/public-number.ts`, birim testli). Yıl, belediyenin saat diliminde hesaplanır (31 Aralık 23:30 Türkiye saati → yeni yıl değil).
 
 ## 6. Index Stratejisi
 
@@ -202,3 +202,57 @@ Sosyal Destek (SOCIAL)             → Sosyal Yardım İşleri
 - Alt kategorinin değeri boşsa ana kategorininki kullanılır (`effectiveSlaMinutes`); ikisi de boşsa SLA takibi yapılmaz.
 - Phase 5: `slaDueAt = createdAt + effectiveSlaMinutes` (ARCHITECTURE §6.3).
 - Demo varsayılanları: 240 (4 saat, gürültü) · 720 (12 saat, çöp) · 1440 (1 gün) · 2880 (2 gün) · 4320 (3 gün).
+
+## 10. Talepler (Phase 5)
+
+### Oluşturma – sunucunun belirledikleri
+
+| Alan                           | Kaynak                                                                                                                            |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `public_number`                | `NumberingService` – belediye + yıl sayacı (belediyenin saat diliminde yıl)                                                       |
+| `department_id`                | seçilen alt kategorinin müdürlüğü – **snapshot**; kategori sonradan başka müdürlüğe bağlansa da talep değişmez                    |
+| `priority`                     | kategorinin `default_priority` (sonra yetkili personel değiştirebilir)                                                            |
+| `sla_due_at`, `sla_at_risk_at` | `created_at` + etkin kategori SLA'sı; risk eşiği = bitişten geriye SLA süresinin %25'i (`settings.slaAtRiskRatio`) – **snapshot** |
+| `neighborhood_id`              | `NeighborhoodLocator` (`ST_Covers`, Phase 4 ile aynı fonksiyon); bulunamazsa `NULL`                                               |
+| `source`                       | personel → `MUNICIPAL_STAFF`, vatandaş web formu → `WEB` (`MOBILE` Phase 12)                                                      |
+| `title`                        | "Kategori – Mahalle" (ör. "Yol Çukuru – Karataş"); vatandaştan ayrıca başlık istenmez                                             |
+| `status`                       | `NEW`                                                                                                                             |
+
+Kategori kuralları: aktif, **yaprak** (alt kategorisi olmayan) ve aktif bir müdürlüğe yönlendirilmiş olmalı.
+
+**Mahalle bulunamazsa talep reddedilmez** (`neighborhood_id = NULL`, yanıtta "Konum tanımlı mahalle sınırları dışında."). Gerekçe: demo mahalle sınırları resmi değil ve gerçek sınır verisinde de boşluklar olabilir; vatandaşın bildirimi kaybolmamalı, operatör konumu kontrol eder.
+
+### SLA snapshot
+
+SLA oluşturma anında dondurulur: kategori SLA'sı veya belediyenin risk oranı sonradan değişirse, ya da talep başka müdürlüğe yönlendirilirse **mevcut talepler etkilenmez**. `sla_due_at` / `sla_at_risk_at` bir DB trigger'ı ile değiştirilemez. SLA durumu saklanmaz, hesaplanır (`evaluateSla`, `@kent360/shared-types`): açık talep şimdiye göre (`BREACHED` > bitiş, `AT_RISK` ≥ risk eşiği, aksi `ON_TIME`); çözülmüş talep `resolved_at` anına göre sabitlenir; reddedilen talepte SLA yoktur.
+
+### Yaşam döngüsü
+
+```
+NEW ─► UNDER_REVIEW ─► ASSIGNED_TO_DEPARTMENT ─► (Phase 6) WORK_ORDER_CREATED ─► IN_PROGRESS ─► RESOLVED ─► VERIFIED ─► CLOSED
+ │  └► (Phase 11) AI_ANALYZED ─┘        │  ▲
+ └──────────────┴──────────────────────┴──┴──► REJECTED (gerekçe zorunlu)
+```
+
+Geçiş tablosunun tamamı `request-status.machine.ts`'te tanımlıdır; her geçiş `manual` (kişi, Phase 5 ucu) ya da `system` (AI / iş emri akışı) olarak işaretlidir. Phase 5'te açık olan elle geçişler: `NEW → UNDER_REVIEW | REJECTED`, `UNDER_REVIEW → ASSIGNED_TO_DEPARTMENT | REJECTED`, `ASSIGNED_TO_DEPARTMENT → UNDER_REVIEW (gerekçeli) | REJECTED`. Sistem geçişleri elle istenirse `409` döner. Durum güncellemesi iyimser eşzamanlılıkla yapılır (`WHERE status = <eski>`).
+
+### Zaman çizelgesi ve denetim
+
+- `request_history`: ürün içi süreç (`CREATED`, `DEPARTMENT_ASSIGNED`, `STATUS_CHANGED`, `PRIORITY_CHANGED`, `MEDIA_ADDED`…), vatandaşa da gösterilir.
+- `audit_logs`: güvenlik denetimi (`REQUEST_CREATED`, `REQUEST_STATUS_CHANGED`, `REQUEST_PRIORITY_CHANGED`, `REQUEST_DEPARTMENT_CHANGED`, `REQUEST_MEDIA_ADDED`). Genel güncelleme ucu olmadığından `REQUEST_UPDATED` kullanılmaz.
+- İkisi de değişiklikle aynı transaction'da yazılır.
+
+### Medya
+
+`request_media.storage_key` tek doğruluk kaynağıdır (`url` kolonu boş kalır): `municipalities/{municipalityId}/requests/{requestId}/{uuid}.{jpg|png|webp}`. Uzantı dosya imzasından gelir; istemci dosya adı hiçbir yerde kullanılmaz. Nesneler private `kent360-media` bucket'ındadır, erişim yalnızca yetki kontrolünden sonra verilen 5 dakikalık presigned URL ile.
+
+### DB kuralları (`20260927000000`, `…0100`, `…0200`)
+
+- Talebin kategorisi, müdürlüğü ve mahallesi aynı belediyeden olmalı (trigger).
+- `public_number`, `municipality_id`, `created_at`, SLA snapshot'ı değişmez; bildiren (`created_by_id`) yalnızca `NULL`'a düşebilir (hesap silinirse), başka kullanıcıya aktarılamaz.
+- `sla_at_risk_at ≤ sla_due_at`, `sla_due_at > created_at` (CHECK).
+- Liste index'leri: `(municipality_id, created_at DESC)` ve `(municipality_id, department_id, created_at DESC)` – yönetici ve müdürlük görünümlerinin varsayılan sıralaması. Diğer filtreler mevcut tek kolon ve trigram index'leriyle karşılanır; mükerrer tespiti (Phase 11) için gerekli `location` GIST, `category_id` ve `created_at` index'leri hazırdır.
+
+### Demo veri
+
+`prisma/seed-requests.ts`: 120 talep, deterministik (sabit tohumlu üreteç), bir kez oluşturulur (zaman çizelgesinde `demoSeed` işareti), son 90 güne yayılmış, açıklamalarda "(Demo kaydı)". Geçmişte kapanmış talepler iş emri kaydı olmadan kapatılmıştır – iş emri verisi Phase 6'da gelir.

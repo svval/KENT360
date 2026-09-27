@@ -155,3 +155,12 @@ Phase 4 ekranları (`/settings/*`) ortak kalıpları kullanır:
 - **Mahalleler:** tablo + şematik SVG sınır önizlemesi (altlıksız; etkileşimli harita Phase 9). Satırın üzerine gelinince önizlemede vurgulanır.
 - **GeoJSON içe aktarma:** dosya seç → istemcide ön kontrol ve özet tablo → "Yalnızca doğrula" (sunucuda `dryRun`) veya "İçe aktar" → öğe bazlı sunucu hataları listelenir; başarıda "12 mahalle başarıyla içe aktarıldı."
 - **Beyaz etiket:** belediye profili kaydedilince `/auth/me` yenilenir; logo ve renkler anında konsola uygulanır. Profil ekranında canlı önizleme bulunur.
+
+## 15. Talep Ekranları (Phase 5)
+
+- **Liste (`/requests`):** kolonlar §10'daki gibi; tüm filtreler URL'de (`/requests?status=NEW&priority=HIGH&page=2`). Vatandaş için başlık "Taleplerim", müdürlük filtresi yok. Boş sonuç: "Bu filtrelere uygun talep bulunamadı." + "Filtreleri temizle".
+- **SLA gösterimi:** her zaman rozet + metin: "SLA içinde · 3 sa 42 dk kaldı", "SLA aşıldı · 1 sa 14 dk aşıldı", kapanmışsa "Süresi içinde sonuçlandı" / "… gecikmeyle sonuçlandı". Açık taleplerde dakikada bir güncellenir (`SlaIndicator`).
+- **Yeni talep (`/requests/new`):** tek sayfa, beş numaralı bölüm (Kategori → Açıklama → Konum → Fotoğraflar → Kontrol ve gönder). Alt kategori seçilince "İlgili birim" ve "Hedef çözüm süresi" bilgi olarak gösterilir; kesin değerleri sunucu belirler. Konum paneli: koordinat + adres, "Konumumu kullan", yalnız geliştirmede "Demo konumu kullan", canlı mahalle çözümü ve şematik önizleme (harita seçici Phase 9). Fotoğraflar: sürükle-bırak, önizleme, istemci tarafı tür/boyut/adet kontrolü.
+- **Gönderim yaşam döngüsü:** önce talep oluşturulur, sonra fotoğraflar tek tek (ilerleme çubuğuyla) yüklenir. Bir fotoğraf başarısız olursa talep silinmez; ekran hangi dosyanın yüklenemediğini gösterir, "Tekrar dene" ve "Fotoğraflar olmadan talebe git" sunar. Vatandaşın bildirimi hiçbir koşulda kaybolmaz.
+- **Detay (`/requests/[id]`):** başlıkta talep no + durum + öncelik; ana kolonda açıklama, fotoğraflar, konum, süreç (zaman çizelgesi, sonraki adım açık uçlu gösterilir); sağ panelde kategori, müdürlük, SLA, kaynak, oluşturulma, bildiren (yalnız yetkili personel). "İşlemler" kartı sunucunun `actions` listesinden oluşur; reddetme ve geri almada gerekçe zorunludur. Toast: "KNT-2026-000121 önceliği "Kritik" olarak güncellendi."
+- Fotoğraf URL'leri 5 dakikalıktır; detay 4 dakikada bir sessizce yenilenir.

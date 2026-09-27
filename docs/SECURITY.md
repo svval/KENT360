@@ -33,7 +33,8 @@ Durum: ✅ uygulandı · 🗓 planlandı (faz)
 - **Sistem Yöneticisi:** belediyenin kendi yöneticisidir – tüm izinler, ama yalnız kendi belediyesinde; müdürlük kısıtından muaftır (`TenantContext.departmentScoped = false`). MVP'de belediyeler arası "süper admin" yoktur.
 - **Sistem rolleri** tüm belediyelerde ortaktır ve API'den değiştirilemez; belediyeler kendi rollerini oluşturup izinlerini yönetir. Kullanıcı kendi rolünü ve durumunu değiştiremez.
 - **Satır bazlı kurallar** (servis katmanında):
-  - Vatandaş yalnızca kendi taleplerini görür (`requests.readOwn`).
+  - Talepler (Phase 5 ✅): sistem yöneticisi belediyenin tümünü, diğer personel kendi müdürlüğünü, herkes kendi bildirdiklerini görür; kapsam dışı → 404 (API_DESIGN §9).
+  - Vatandaş yalnızca kendi taleplerini görür (`requests.readOwn`); yanıtlarda personel adları ve iç kullanıcı bilgisi yer almaz.
   - Saha personeli yalnızca kendisine/ekibine atanmış iş emirlerini görür (`workOrders.readAssigned`).
   - Müdürlük yöneticisi kendi müdürlüğüyle sınırlıdır (System Admin hariç).
 - Frontend yalnızca gizler; **yetki kararı her zaman backend'dedir.**
@@ -46,13 +47,14 @@ Durum: ✅ uygulandı · 🗓 planlandı (faz)
 - **Rate limit:** Global 120/dk/IP ✅; hassas uçlar için özel limitler 🗓 ([API_DESIGN.md](API_DESIGN.md#6-rate-limit)). Çoklu instance'ta Redis storage'a geçilir.
 - **Web başlıkları:** Next.js `X-Frame-Options: DENY`, `Permissions-Policy` (kamera/konum yalnızca kendi origin), `poweredByHeader: false` ✅.
 
-## 5. Dosya Yükleme (Phase 5–6) 🗓
+## 5. Dosya Yükleme (Phase 5 ✅, iş emri kanıtı Phase 6)
 
-- İzinli türler: **JPEG, PNG, WEBP**. Üç katmanlı kontrol: `Content-Type`, uzantı ve dosyanın **magic byte** imzası (istemcinin beyanına güvenilmez).
-- Boyut sınırı: 8 MB/dosya, talep başına 5 fotoğraf.
-- Object key sunucuda üretilir (`{municipalityId}/requests/{yyyy}/{mm}/{uuidv7}.{ext}`); istemci dosya adı hiçbir yerde kullanılmaz → path traversal imkânsız.
-- EXIF temizliği: konum dışındaki meta veriler silinir (cihaz seri no vb.).
-- Bucket private; erişim 5–15 dk ömürlü presigned URL ile.
+- İzinli türler: **JPEG, PNG, WEBP**. Tür dosyanın **ilk baytlarındaki imzadan** (magic byte) belirlenir; bildirilen `Content-Type` imzayla uyuşmalıdır, uzantı ve dosya adı hiç kullanılmaz (GIF'i `.jpg` diye göndermek → `415`).
+- Boyut sınırı: **10 MB/dosya** (multer sınırı → `413`), talep başına **5** fotoğraf.
+- Object key tamamen sunucuda üretilir: `municipalities/{municipalityId}/requests/{requestId}/{uuid}.{ext}` → path traversal ve üzerine yazma imkânsız.
+- Bucket **private**; imzasız erişim `403`. Erişim, talep erişim kontrolünden sonra verilen **5 dakikalık** presigned URL ile (`MEDIA_URL_TTL_SECONDS`). Kalıcı URL saklanmaz; `storage_key` doğruluk kaynağıdır.
+- Veritabanı kaydı başarısız olursa yüklenen nesneler silinir.
+- 🗓 EXIF temizliği (konum dışı meta veri, cihaz seri no) henüz yok – görüntü işleme kütüphanesi gerektirir; teknik borç.
 
 ## 6. Veritabanı ✅
 

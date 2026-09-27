@@ -131,20 +131,34 @@ Hiçbir uçta silme (DELETE) yoktur: kayıtlar `status: INACTIVE` ile pasifleşt
 
 Kategori yanıtı yönlendirme ve SLA bilgisini hazır verir: `department { id, name, code, status }`, `defaultPriority`, `defaultSlaMinutes` (kendi değeri, `null` = miras), `effectiveSlaMinutes` (kendi ?? ana kategori), `slaLabel` ("4 saat", "1 gün 12 saat"). Kurallar ve hata kodları: [DATABASE_DESIGN.md §9](DATABASE_DESIGN.md#9-belediye-domaini-phase-4).
 
-### Requests (Phase 5, AI: Phase 11)
+### Requests (Phase 5) ✅
 
-| Metot | Yol                         | İzin                                                                       |
-| ----- | --------------------------- | -------------------------------------------------------------------------- |
-| POST  | `/requests/analyze`         | `requests.create` – AI önerisi + duplicate adayları (kaydetmeden)          |
-| POST  | `/requests`                 | `requests.create` · rate limit                                             |
-| POST  | `/requests/:id/media`       | `requests.create` (sahibi) · multipart                                     |
-| POST  | `/requests/:id/join`        | `requests.create` – mevcut bildirime katıl                                 |
-| GET   | `/requests`                 | `requests.read` (belediye) / `requests.readOwn` (vatandaş: yalnızca kendi) |
-| GET   | `/requests/:id`             | aynı                                                                       |
-| GET   | `/requests/:id/timeline`    | aynı                                                                       |
-| PATCH | `/requests/:id`             | `requests.update` – kategori/öncelik düzeltme (audit)                      |
-| POST  | `/requests/:id/transitions` | `requests.update` / `requests.assign` – `{ to, reason? }`                  |
-| GET   | `/requests/map?bbox=`       | `requests.read` – GeoJSON                                                  |
+| Metot | Yol                                | İzin                                                                                                                                                                                                                                                             |
+| ----- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST  | `/requests`                        | `requests.create` (audit: `REQUEST_CREATED`) · 30/saat/IP. Gövde yalnızca `categoryId, description, latitude, longitude, address?` – diğer her alan (müdürlük, öncelik, SLA, mahalle, kaynak, durum, numara, başlık) **sunucuda** belirlenir; gönderilirse `400` |
+| GET   | `/requests`                        | `requests.read` **veya** `requests.readOwn` – kapsama göre otomatik daraltılır (bkz. §9)                                                                                                                                                                         |
+| GET   | `/requests/:id`                    | aynı – kapsam dışı / başka belediye → `404 REQUEST_NOT_FOUND`                                                                                                                                                                                                    |
+| POST  | `/requests/:id/transitions`        | `requests.update` / `requests.assign` (geçişe göre) – `{ to, reason? }` (audit: `REQUEST_STATUS_CHANGED`)                                                                                                                                                        |
+| PATCH | `/requests/:id/priority`           | `requests.update` – `{ priority, reason? }` (audit: `REQUEST_PRIORITY_CHANGED`)                                                                                                                                                                                  |
+| PATCH | `/requests/:id/department`         | `requests.assign` – `{ departmentId, reason? }`, yalnız aktif müdürlük; SLA değişmez (audit: `REQUEST_DEPARTMENT_CHANGED`)                                                                                                                                       |
+| POST  | `/requests/:id/media`              | `requests.create` (sahibi) veya `requests.update` – multipart `files` (audit: `REQUEST_MEDIA_ADDED`)                                                                                                                                                             |
+| GET   | `/requests/:id/media/:mediaId/url` | talebi görebilen – yeni kısa ömürlü URL                                                                                                                                                                                                                          |
+
+Genel `PATCH /requests/:id` **yoktur**: değişiklikler niyet bildiren uçlarla yapılır, `createdBy`, `municipalityId`, `publicNumber`, `createdAt` ve SLA snapshot'ı hiçbir uçtan değiştirilemez (DB trigger'ı da reddeder).
+
+Liste parametreleri: `page`, `pageSize` (≤ 100), `sort` (`createdAt`, `slaDueAt`, `priority`, `publicNumber`, `status`; varsayılan `-createdAt`), `status` ve `priority` (çoklu: `?status=NEW&status=UNDER_REVIEW` ya da virgüllü), `categoryId` (ana kategori seçilirse alt kategorileri de), `departmentId`, `neighborhoodId`, `source`, `createdFrom`, `createdTo`, `slaStatus` (`ON_TIME | AT_RISK | BREACHED`), `search` (tam talep no, yoksa açıklama/adres – trigram index'li `ILIKE`), `mine=true`.
+
+Detay yanıtı: kategori (+ ana kategori), müdürlük, mahalle, konum, `locationNotice` ("Konum tanımlı mahalle sınırları dışında." – mahalle bulunamadıysa), `sla: { dueAt, atRiskAt, status, remainingMinutes }`, `media[]` (5 dk'lık presigned `url`), `timeline[]` (vatandaşa personel adı gösterilmez), `reporter` (yalnız `users.read` sahibi personele) ve `actions` (kullanıcının yapabileceği geçişler / değişiklikler – sunucu aynı kuralları uygular).
+
+Hata kodları: `CATEGORY_NOT_FOUND`, `CATEGORY_INACTIVE`, `CATEGORY_NOT_SELECTABLE` (alt kategorisi olan ana kategori), `CATEGORY_NOT_ROUTABLE`, `DEPARTMENT_INACTIVE`, `INVALID_STATUS_TRANSITION` (`details: { from, to, allowed }`), `TRANSITION_REASON_REQUIRED`, `REQUEST_CLOSED`, `MEDIA_LIMIT_REACHED`, `UNSUPPORTED_MEDIA_TYPE` (415), `PAYLOAD_TOO_LARGE` (413), `STORAGE_UNAVAILABLE` (503).
+
+### Requests – sonraki fazlar 🗓
+
+| Metot | Yol                   | Faz                                                      |
+| ----- | --------------------- | -------------------------------------------------------- |
+| POST  | `/requests/analyze`   | Phase 11 – AI önerisi + duplicate adayları (kaydetmeden) |
+| POST  | `/requests/:id/join`  | Phase 11 – mevcut bildirime katıl                        |
+| GET   | `/requests/map?bbox=` | Phase 9 – GeoJSON                                        |
 
 ### Work Orders & Field (Phase 6)
 
@@ -244,3 +258,15 @@ Tüm geometriler **RFC 7946 GeoJSON**, koordinatlar **WGS84 (EPSG:4326)** ve `[b
 - Başarı: `200 { imported, failed: 0, dryRun: false, codes }`. Hata: `400 NEIGHBORHOOD_IMPORT_FAILED`, `details: { imported: 0, failed, errors: [{ index, code, message }] }`.
 
 **Noktadan mahalle – `GET /neighborhoods/resolve`.** `ST_Covers` kullanılır, `ST_Contains` değil: `ST_Contains` sınır çizgisi üzerindeki noktayı "içeride" saymaz, dolayısıyla komşu mahallelerin ortak sınırındaki bir talep hiçbir mahalleye düşmezdi. `ST_Covers` ile sınırdaki nokta eşleşir; iki mahalle birden kapsıyorsa **alanı küçük olan**, sonra **kodu küçük olan** seçilir (deterministik). Sorgu GIST index'ini kullanır.
+
+## 9. Talep Erişim Kapsamı (object scope)
+
+RBAC izni tek başına yetmez; her talep sorgusu kullanıcının kapsamıyla daraltılır ve kapsam dışı talep **404** döner (varlığı sızdırılmaz):
+
+| Kullanıcı                                                           | Görebildiği talepler                                                 |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| System Admin (`requests.read`, müdürlük kısıtı yok)                 | belediyenin tüm talepleri                                            |
+| Diğer personel (`requests.read`)                                    | kendi müdürlüğüne yönlendirilmiş talepler (müdürlüğü yoksa: hiçbiri) |
+| Talep oluşturabilen herkes (`requests.create` / `requests.readOwn`) | kendi bildirdiği talepler                                            |
+
+Kurallar toplanır (bir müdür kendi müdürlüğünü ve kendi bildirdiklerini görür). Filtre parametreleri kapsamın **içinde** uygulanır; `?departmentId=…` ile kapsam genişletilemez. Medya uçları aynı kontrolü tekrar uygular. Saha personeli (Phase 6) iş emri ataması üzerinden daha dar bir kapsam alacak.
