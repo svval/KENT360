@@ -50,11 +50,19 @@ Durum: ✅ uygulandı · 🗓 planlandı (faz)
 ## 5. Dosya Yükleme (Phase 5 ✅, iş emri kanıtı Phase 6)
 
 - İzinli türler: **JPEG, PNG, WEBP**. Tür dosyanın **ilk baytlarındaki imzadan** (magic byte) belirlenir; bildirilen `Content-Type` imzayla uyuşmalıdır, uzantı ve dosya adı hiç kullanılmaz (GIF'i `.jpg` diye göndermek → `415`).
-- Boyut sınırı: **10 MB/dosya** (multer sınırı → `413`), talep başına **5** fotoğraf.
+- Boyut sınırı: **10 MB/dosya** (multer sınırı → `413 PAYLOAD_TOO_LARGE`), talep başına **5** fotoğraf.
 - Object key tamamen sunucuda üretilir: `municipalities/{municipalityId}/requests/{requestId}/{uuid}.{ext}` → path traversal ve üzerine yazma imkânsız.
 - Bucket **private**; imzasız erişim `403`. Erişim, talep erişim kontrolünden sonra verilen **5 dakikalık** presigned URL ile (`MEDIA_URL_TTL_SECONDS`). Kalıcı URL saklanmaz; `storage_key` doğruluk kaynağıdır.
 - Veritabanı kaydı başarısız olursa yüklenen nesneler silinir.
-- 🗓 EXIF temizliği (konum dışı meta veri, cihaz seri no) henüz yok – görüntü işleme kütüphanesi gerektirir; teknik borç.
+- **Görüntü normalizasyonu ✅** (`storage/image-normalizer.ts`, `sharp`/libvips): kullanıcıdan gelen bayt **olduğu gibi saklanmaz**.
+  1. İmza + bildirilen tür kontrolü (yukarıdaki kural).
+  2. Yalnızca başlık okunur (piksel çözülmeden): **> 40 MP** veya bir kenarı **> 12 000 px** → `413 IMAGE_DIMENSIONS_TOO_LARGE` (decompression bomb koruması; çözme de `limitInputPixels` ile sınırlı). Çok kareli (animasyonlu WEBP/PNG) → `415`.
+  3. Tam çözülür; bozuk/eksik veri → `400 INVALID_IMAGE`.
+  4. EXIF yönü piksellere uygulanır, en uzun kenar **4096 px**'e küçültülür (büyütülmez).
+  5. **Aynı formatta** yeniden kodlanır (JPEG q85 mozjpeg, PNG lossless, WEBP q85) ve **hiçbir meta veri yazılmaz**: EXIF (GPS, cihaz marka/model/seri no dahil), XMP, IPTC, yorumlar, ICC profili (pikseller sRGB'ye dönüştürülür). Saklanan `mime_type` / `size_bytes` çıktıya aittir.
+  - Çıktı formatı = girdi formatı: PNG/WEBP şeffaflığı korunur, istemcinin gönderdiği tür arkasından değişmez; üç format da yeniden kodlandıktan sonra tarayıcıda güvenle gösterilir.
+  - Konum talebin kendi `latitude/longitude` alanındadır; fotoğraftaki GPS hiçbir zaman okunmaz ve saklanmaz.
+  - Testler gerçek görsellerle yapılır (`test/support/images.ts`: EXIF + GPS + XMP + Orientation 6 içeren JPEG, meta verili PNG/WEBP, başlığı 20 000² diyen PNG, animasyonlu WEBP, bozuk JPEG) ve çıktıda meta veri alanlarının yanı sıra gömülü metinlerin bayt düzeyinde de bulunmadığı doğrulanır.
 
 ## 6. Veritabanı ✅
 

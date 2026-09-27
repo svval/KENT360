@@ -190,7 +190,7 @@ npm run typecheck
 npm run lint
 ```
 
-The e2e suites run against a separate `kent360_test` database on the same PostgreSQL server (created and migrated automatically; the development database is never touched). Fixtures use unique names per run, so the database is not wiped between runs — drop `kent360_test` by hand for a clean slate.
+The e2e suites run against a separate `kent360_test` database on the same PostgreSQL server (created and migrated automatically; the development database is never touched); uploads go to a separate private `kent360-media-test` bucket. Fixtures use unique names per run, so the database is not wiped between runs — drop `kent360_test` by hand for a clean slate.
 
 ## Roadmap
 

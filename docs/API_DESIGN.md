@@ -41,16 +41,16 @@ Hata:
 - `requestId`, `x-request-id` yanıt header'ı ve sunucu log'larıyla aynıdır (destek taleplerinde kullanılır).
 - 5xx hatalarında iç hata mesajı/stack **asla** dönmez.
 
-| HTTP      | `code`                                                   | Durum                                             |
-| --------- | -------------------------------------------------------- | ------------------------------------------------- |
-| 400       | `VALIDATION_FAILED`                                      | DTO doğrulaması; `details` alan mesajları listesi |
-| 401       | `UNAUTHORIZED`                                           | Token yok / geçersiz / süresi dolmuş              |
-| 403       | `FORBIDDEN`                                              | Yetki yok ya da başka belediyenin kaydı           |
-| 404       | `NOT_FOUND`, `REQUEST_NOT_FOUND`, `WORK_ORDER_NOT_FOUND` |                                                   |
-| 409       | `CONFLICT`, `INVALID_STATUS_TRANSITION`                  | Domain kuralı ihlali                              |
-| 413 / 415 | `PAYLOAD_TOO_LARGE` / `UNSUPPORTED_MEDIA_TYPE`           | Dosya yükleme                                     |
-| 429       | `RATE_LIMITED`                                           |                                                   |
-| 503       | `SERVICE_UNAVAILABLE`                                    | Bağımlılık erişilemiyor                           |
+| HTTP      | `code`                                                                       | Durum                                             |
+| --------- | ---------------------------------------------------------------------------- | ------------------------------------------------- |
+| 400       | `VALIDATION_FAILED`                                                          | DTO doğrulaması; `details` alan mesajları listesi |
+| 401       | `UNAUTHORIZED`                                                               | Token yok / geçersiz / süresi dolmuş              |
+| 403       | `FORBIDDEN`                                                                  | Yetki yok ya da başka belediyenin kaydı           |
+| 404       | `NOT_FOUND`, `REQUEST_NOT_FOUND`, `WORK_ORDER_NOT_FOUND`                     |                                                   |
+| 409       | `CONFLICT`, `INVALID_STATUS_TRANSITION`                                      | Domain kuralı ihlali                              |
+| 413 / 415 | `PAYLOAD_TOO_LARGE`, `IMAGE_DIMENSIONS_TOO_LARGE` / `UNSUPPORTED_MEDIA_TYPE` | Dosya yükleme                                     |
+| 429       | `RATE_LIMITED`                                                               |                                                   |
+| 503       | `SERVICE_UNAVAILABLE`                                                        | Bağımlılık erişilemiyor                           |
 
 ## 2. Kimlik Doğrulama
 
@@ -150,7 +150,7 @@ Liste parametreleri: `page`, `pageSize` (≤ 100), `sort` (`createdAt`, `slaDueA
 
 Detay yanıtı: kategori (+ ana kategori), müdürlük, mahalle, konum, `locationNotice` ("Konum tanımlı mahalle sınırları dışında." – mahalle bulunamadıysa), `sla: { dueAt, atRiskAt, status, remainingMinutes }`, `media[]` (5 dk'lık presigned `url`), `timeline[]` (vatandaşa personel adı gösterilmez), `reporter` (yalnız `users.read` sahibi personele) ve `actions` (kullanıcının yapabileceği geçişler / değişiklikler – sunucu aynı kuralları uygular).
 
-Hata kodları: `CATEGORY_NOT_FOUND`, `CATEGORY_INACTIVE`, `CATEGORY_NOT_SELECTABLE` (alt kategorisi olan ana kategori), `CATEGORY_NOT_ROUTABLE`, `DEPARTMENT_INACTIVE`, `INVALID_STATUS_TRANSITION` (`details: { from, to, allowed }`), `TRANSITION_REASON_REQUIRED`, `REQUEST_CLOSED`, `MEDIA_LIMIT_REACHED`, `UNSUPPORTED_MEDIA_TYPE` (415), `PAYLOAD_TOO_LARGE` (413), `STORAGE_UNAVAILABLE` (503).
+Hata kodları: `CATEGORY_NOT_FOUND`, `CATEGORY_INACTIVE`, `CATEGORY_NOT_SELECTABLE` (alt kategorisi olan ana kategori), `CATEGORY_NOT_ROUTABLE`, `DEPARTMENT_INACTIVE`, `INVALID_STATUS_TRANSITION` (`details: { from, to, allowed }`), `TRANSITION_REASON_REQUIRED`, `REQUEST_CLOSED`, `MEDIA_LIMIT_REACHED`, `UNSUPPORTED_MEDIA_TYPE` (415; animasyonlu görüntü dahil), `PAYLOAD_TOO_LARGE` (413), `IMAGE_DIMENSIONS_TOO_LARGE` (413, `details: { index, width, height }`), `INVALID_IMAGE` (400, çözülemeyen/bozuk görüntü), `STORAGE_UNAVAILABLE` (503).
 
 ### Requests – sonraki fazlar 🗓
 

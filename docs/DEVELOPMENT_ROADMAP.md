@@ -77,11 +77,11 @@ Durum: ✅ tamamlandı · 🟡 kısmen · ⬜ planlandı
 - ✅ `request_history` zaman çizelgesi + audit, aynı transaction'da
 - ✅ Object scope: admin / müdürlük / kendi talepleri; kapsam dışı 404
 - ✅ Liste: sayfalama, izinli sıralama, durum/öncelik/kategori/müdürlük/mahalle/kaynak/tarih/SLA filtreleri, arama
-- ✅ Medya: imza doğrulamalı JPEG/PNG/WEBP, private MinIO, presigned URL
+- ✅ Medya: imza doğrulamalı JPEG/PNG/WEBP, private MinIO, presigned URL; yeniden kodlama ile EXIF/GPS/XMP temizliği, yön düzeltme, piksel sınırı (stabilizasyon)
 - ✅ Web: `/requests` (URL filtreli tablo), `/requests/new` (kategori → açıklama → konum paneli → fotoğraf → kontrol), `/requests/[id]` (detay, SLA, işlemler, süreç)
 - ✅ **Seed:** 120 deterministik demo talep (son 90 gün)
 - ✅ **Testler:** unit (durum makinesi, SLA, dosya imzası, kapsam, yıl) + e2e (numara eşzamanlılığı / yıl / belediye, yönlendirme, SLA snapshot, kapsamlar, filtreler, iş akışı, geçmiş/audit, medya güvenliği)
-- ⏭ Harita üzerinden konum seçimi → Phase 9 (MapLibre); mükerrer tespiti ve AI → Phase 11; EXIF temizliği → teknik borç
+- ⏭ Harita üzerinden konum seçimi → Phase 9 (MapLibre); mükerrer tespiti ve AI → Phase 11
 
 ## Phase 6 – İş Emirleri
 

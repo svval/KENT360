@@ -244,7 +244,7 @@ Geçiş tablosunun tamamı `request-status.machine.ts`'te tanımlıdır; her ge�
 
 ### Medya
 
-`request_media.storage_key` tek doğruluk kaynağıdır (`url` kolonu boş kalır): `municipalities/{municipalityId}/requests/{requestId}/{uuid}.{jpg|png|webp}`. Uzantı dosya imzasından gelir; istemci dosya adı hiçbir yerde kullanılmaz. Nesneler private `kent360-media` bucket'ındadır, erişim yalnızca yetki kontrolünden sonra verilen 5 dakikalık presigned URL ile.
+`request_media.storage_key` tek doğruluk kaynağıdır (`url` kolonu boş kalır): `municipalities/{municipalityId}/requests/{requestId}/{uuid}.{jpg|png|webp}`. Uzantı dosya imzasından gelir; istemci dosya adı hiçbir yerde kullanılmaz. Saklanan nesne, meta verisi (EXIF/GPS/XMP) atılarak yeniden kodlanmış görüntüdür; `mime_type` ve `size_bytes` bu çıktıyı tanımlar (SECURITY §5). Nesneler private `kent360-media` bucket'ındadır (e2e testleri ayrı `kent360-media-test` bucket'ını kullanır), erişim yalnızca yetki kontrolünden sonra verilen 5 dakikalık presigned URL ile.
 
 ### DB kuralları (`20260927000000`, `…0100`, `…0200`)
 
@@ -255,4 +255,4 @@ Geçiş tablosunun tamamı `request-status.machine.ts`'te tanımlıdır; her ge�
 
 ### Demo veri
 
-`prisma/seed-requests.ts`: 120 talep, deterministik (sabit tohumlu üreteç), bir kez oluşturulur (zaman çizelgesinde `demoSeed` işareti), son 90 güne yayılmış, açıklamalarda "(Demo kaydı)". Geçmişte kapanmış talepler iş emri kaydı olmadan kapatılmıştır – iş emri verisi Phase 6'da gelir.
+`prisma/seed-requests.ts`: 120 talep, deterministik (sabit tohumlu üreteç), bir kez oluşturulur (zaman çizelgesinde `demoSeed` işareti), son 90 güne yayılmış, açıklamalarda "(Demo kaydı)". Geçmişte kapanmış talepler iş emri kaydı olmadan kapatılmıştır – iş emri verisi Phase 6'da gelir. Talep numaraları sıra sayacından gelir ve **geri alınmaz**: geliştirme veritabanında eski demo kayıtları silinip yeniden seed edildiğinde numaralar kaldığı yerden devam eder (ör. `KNT-2026-000122…000241`); audit kayıtları append-only olduğu için silinmez.
