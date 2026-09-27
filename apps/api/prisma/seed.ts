@@ -4,7 +4,7 @@
  * Seeds the RBAC catalogue (from @kent360/shared-types), the demo municipality and
  * the demo accounts (password: Kent360!Demo), departments, the request category tree and
  * DEMO neighbourhood geometries (not official boundaries – see prisma/seed-domain.ts).
- * Requests and work orders follow in Phase 5–6.
+ * 120 deterministic DEMO requests (Phase 5, created once). Work orders follow in Phase 6.
  *
  * Never run against a production database: it refuses NODE_ENV=production.
  */
@@ -15,6 +15,7 @@ import { PrismaClient } from '../src/generated/prisma/client';
 import { hashPassword } from '../src/modules/auth/domain/password-policy';
 import { seedDemoMunicipality, seedDemoUsers, seedRbac } from './seed-data';
 import { seedMunicipalityDomain } from './seed-domain';
+import { seedDemoRequests } from './seed-requests';
 
 loadEnv({ path: path.resolve(__dirname, '../../../.env'), quiet: true });
 loadEnv({ quiet: true });
@@ -36,6 +37,7 @@ async function main(): Promise<void> {
   const municipalityId = await seedDemoMunicipality(prisma);
   const newUsers = await seedDemoUsers(prisma, municipalityId, roleIds, hashPassword);
   const domain = await seedMunicipalityDomain(prisma, municipalityId);
+  const requests = await seedDemoRequests(prisma, municipalityId);
 
   const [permissions, roles, mappings, municipalities, users] = await Promise.all([
     prisma.permission.count(),
@@ -49,7 +51,7 @@ async function main(): Promise<void> {
       `${permissions} permissions, ${roles} system roles, ${mappings} role-permission links, ` +
       `${municipalities} municipality, ${users} users (${newUsers} new); new domain records: ` +
       `${domain.departments} departments, ${domain.categories} categories, ` +
-      `${domain.neighborhoods} neighbourhoods`,
+      `${domain.neighborhoods} neighbourhoods, ${requests} demo requests`,
   );
 }
 

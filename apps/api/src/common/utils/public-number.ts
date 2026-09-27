@@ -42,3 +42,13 @@ export function parsePublicNumber(
     sequence: Number(sequence),
   };
 }
+
+/**
+ * Calendar year of `date` in the municipality's time zone: numbering restarts with the
+ * local new year (31 Dec 23:30 in Istanbul is still the old year, even though UTC is too;
+ * 1 Jan 00:30 Istanbul is 31 Dec 21:30 UTC but already the new year).
+ */
+export function yearInTimeZone(date: Date, timeZone: string): number {
+  const year = new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric' }).format(date);
+  return Number(year);
+}

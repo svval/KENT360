@@ -34,6 +34,10 @@ export const envSchema = z.object({
   MINIO_ACCESS_KEY: z.string().min(1).default('kent360'),
   MINIO_SECRET_KEY: z.string().min(1).default('kent360_dev_secret'),
   MINIO_BUCKET: z.string().min(3).default('kent360-media'),
+  /** Host browsers use for presigned URLs when it differs from MINIO_ENDPOINT (e.g. behind a proxy). */
+  MINIO_PUBLIC_ENDPOINT: z.string().url().optional(),
+  /** Lifetime of presigned media URLs, in seconds (1–3600). */
+  MEDIA_URL_TTL_SECONDS: z.coerce.number().int().min(1).max(3600).default(300),
 
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
   JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),

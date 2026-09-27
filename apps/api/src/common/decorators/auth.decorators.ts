@@ -5,6 +5,7 @@ import { requestMetaOf } from '../utils/request-meta';
 
 export const IS_PUBLIC_KEY = 'kent360:isPublic';
 export const PERMISSIONS_KEY = 'kent360:permissions';
+export const ANY_PERMISSIONS_KEY = 'kent360:anyPermissions';
 
 /** Opts a route out of JwtAuthGuard (every route requires a session by default). */
 export const Public = (): MethodDecorator & ClassDecorator => SetMetadata(IS_PUBLIC_KEY, true);
@@ -15,6 +16,13 @@ export const Public = (): MethodDecorator & ClassDecorator => SetMetadata(IS_PUB
  */
 export const Permissions = (...permissions: Permission[]): MethodDecorator & ClassDecorator =>
   SetMetadata(PERMISSIONS_KEY, permissions);
+
+/**
+ * Requires AT LEAST ONE of the listed permissions – for routes whose object scope then
+ * depends on which one the user holds (e.g. requests.read vs requests.readOwn).
+ */
+export const PermissionsAny = (...permissions: Permission[]): MethodDecorator & ClassDecorator =>
+  SetMetadata(ANY_PERMISSIONS_KEY, permissions);
 
 function userOf(ctx: ExecutionContext): AuthUser {
   const user = ctx.switchToHttp().getRequest<AuthenticatedRequest>().user;

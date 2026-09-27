@@ -2,7 +2,11 @@ import { type ExecutionContext, ForbiddenException, UnauthorizedException } from
 import { Reflector } from '@nestjs/core';
 import { Permission } from '@kent360/shared-types';
 import { type AuthUser } from '../../../common/auth/auth-user';
-import { IS_PUBLIC_KEY, PERMISSIONS_KEY } from '../../../common/decorators/auth.decorators';
+import {
+  ANY_PERMISSIONS_KEY,
+  IS_PUBLIC_KEY,
+  PERMISSIONS_KEY,
+} from '../../../common/decorators/auth.decorators';
 import { type AuthService } from '../auth.service';
 import { type AccessTokenPayload, type TokenService } from '../token.service';
 import { throttleTracker } from './app-throttler.guard';
@@ -59,6 +63,22 @@ describe('PermissionsGuard', () => {
 
   it('denies when no user is attached', () => {
     const { ctx, reflector } = context({}, { [PERMISSIONS_KEY]: [Permission.REQUESTS_READ] });
+    expect(() => new PermissionsGuard(reflector).canActivate(ctx)).toThrow(ForbiddenException);
+  });
+
+  it('allows @PermissionsAny when at least one permission is held', () => {
+    const { ctx, reflector } = context(
+      { user },
+      { [ANY_PERMISSIONS_KEY]: [Permission.REQUESTS_READ_OWN, Permission.REQUESTS_READ] },
+    );
+    expect(new PermissionsGuard(reflector).canActivate(ctx)).toBe(true);
+  });
+
+  it('denies @PermissionsAny when none is held', () => {
+    const { ctx, reflector } = context(
+      { user },
+      { [ANY_PERMISSIONS_KEY]: [Permission.REQUESTS_CREATE, Permission.REQUESTS_UPDATE] },
+    );
     expect(() => new PermissionsGuard(reflector).canActivate(ctx)).toThrow(ForbiddenException);
   });
 });

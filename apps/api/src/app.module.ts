@@ -19,6 +19,9 @@ import { MunicipalityModule } from './modules/municipality/municipality.module';
 import { DepartmentsModule } from './modules/departments/departments.module';
 import { NeighborhoodsModule } from './modules/neighborhoods/neighborhoods.module';
 import { RequestCategoriesModule } from './modules/request-categories/request-categories.module';
+import { NumberingModule } from './modules/numbering/numbering.module';
+import { RequestsModule } from './modules/requests/requests.module';
+import { StorageModule } from './modules/storage/storage.module';
 
 @Module({
   imports: [
@@ -97,6 +100,9 @@ import { RequestCategoriesModule } from './modules/request-categories/request-ca
     DepartmentsModule,
     NeighborhoodsModule,
     RequestCategoriesModule,
+    StorageModule,
+    NumberingModule,
+    RequestsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: AppThrottlerGuard },

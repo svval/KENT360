@@ -19,6 +19,7 @@ import { changedFields, isUniqueViolation, pickFields } from '../../common/utils
 import { type RequestMeta } from '../../common/utils/request-meta';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { NeighborhoodLocator } from './neighborhood-locator';
 import {
   crsError,
   type ImportFeature,
@@ -81,6 +82,7 @@ export class NeighborhoodsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly locator: NeighborhoodLocator,
   ) {}
 
   // ─── Read ─────────────────────────────────────────────────────────────────
@@ -151,20 +153,9 @@ export class NeighborhoodsService {
     return row.body;
   }
 
-  /**
-   * Which active neighbourhood contains the point? ST_Covers (not ST_Contains) so that a
-   * point exactly on a boundary line still resolves; where two neighbourhoods share that
-   * line, the smaller one wins, then the lower code – deterministic either way.
-   */
-  async resolve(actor: AuthUser, lat: number, lng: number): Promise<NeighborhoodResolution | null> {
-    const rows = await this.prisma.$queryRaw<NeighborhoodResolution[]>`
-      SELECT id, name, code FROM neighborhoods
-      WHERE municipality_id = ${actor.municipalityId}::uuid
-        AND status = 'ACTIVE' AND boundary IS NOT NULL
-        AND ST_Covers(boundary, ST_SetSRID(ST_MakePoint(${lng}::float8, ${lat}::float8), 4326))
-      ORDER BY ST_Area(boundary) ASC, code ASC
-      LIMIT 1`;
-    return rows[0] ?? null;
+  /** Which active neighbourhood contains the point? See NeighborhoodLocator. */
+  resolve(actor: AuthUser, lat: number, lng: number): Promise<NeighborhoodResolution | null> {
+    return this.locator.locate(actor.municipalityId, lat, lng);
   }
 
   // ─── Write ────────────────────────────────────────────────────────────────
