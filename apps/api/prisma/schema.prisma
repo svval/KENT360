@@ -425,7 +425,7 @@ model Request {
   id             String        @id @default(uuid(7)) @db.Uuid
   municipalityId String        @map("municipality_id") @db.Uuid
   /// Human-readable number, e.g. KNT-2026-000001 (see NumberSequence).
-  publicNumber   String        @unique @map("public_number") @db.VarChar(32)
+  publicNumber   String        @map("public_number") @db.VarChar(32)
   createdById    String?       @map("created_by_id") @db.Uuid
   categoryId     String?       @map("category_id") @db.Uuid
   departmentId   String?       @map("department_id") @db.Uuid
@@ -444,7 +444,10 @@ model Request {
   aiAnalyzed     Boolean       @default(false) @map("ai_analyzed")
   /// Number of citizens who joined this request instead of filing a duplicate.
   supporterCount Int           @default(0) @map("supporter_count")
+  /// SLA snapshot taken at creation (createdAt + category effective SLA); never recomputed.
   slaDueAt       DateTime?     @map("sla_due_at") @db.Timestamptz(3)
+  /// Snapshot of the moment the SLA becomes AT_RISK (slaDueAt − ratio × SLA duration).
+  slaAtRiskAt    DateTime?     @map("sla_at_risk_at") @db.Timestamptz(3)
   rejectionReason String?      @map("rejection_reason") @db.Text
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -465,7 +468,12 @@ model Request {
   duplicateOf      DuplicateMatch[]  @relation("DuplicateTarget")
   comments         Comment[]
 
+  // Numbers are sequenced per municipality and year, so they are unique per municipality.
+  @@unique([municipalityId, publicNumber])
   @@index([municipalityId, status])
+  // Default list order (newest first) for the whole municipality and for a department.
+  @@index([municipalityId, createdAt(sort: Desc)])
+  @@index([municipalityId, departmentId, createdAt(sort: Desc)])
   @@index([status])
   @@index([priority])
   @@index([categoryId])
@@ -579,7 +587,7 @@ model WorkOrder {
   id                    String          @id @default(uuid(7)) @db.Uuid
   municipalityId        String          @map("municipality_id") @db.Uuid
   /// Human-readable number, e.g. WO-2026-000001.
-  publicNumber          String          @unique @map("public_number") @db.VarChar(32)
+  publicNumber          String          @map("public_number") @db.VarChar(32)
   requestId             String?         @map("request_id") @db.Uuid
   departmentId          String          @map("department_id") @db.Uuid
   /// Current assignee (denormalised from the active WorkOrderAssignment for fast lookups).
@@ -619,6 +627,8 @@ model WorkOrder {
   history      WorkOrderHistory[]
   comments     Comment[]
 
+  // Sequenced per municipality and year (see Request.publicNumber).
+  @@unique([municipalityId, publicNumber])
   @@index([municipalityId, status])
   @@index([status])
   @@index([assignedUserId, status])
