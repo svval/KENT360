@@ -114,6 +114,12 @@ export async function seedDemoRequests(
       })
     ).map((u) => [u.email.split('@')[0], u.id]),
   );
+  const managerDepartmentId = (
+    await prisma.user.findFirst({
+      where: { municipalityId, email: 'manager@kent360.local' },
+      select: { departmentId: true },
+    })
+  )?.departmentId;
   const leaves = await prisma.requestCategory.findMany({
     where: {
       municipalityId,
@@ -181,7 +187,10 @@ export async function seedDemoRequests(
     const neighborhood = outside ? null : (neighborhoods.find((x) => x.code === demo.code) ?? null);
 
     // Reporter & channel
-    const channel = item.i % 15 === 0 ? 'citizen' : random() < 0.7 ? 'admin' : 'manager';
+    // Citizens report online; the call centre (admin) logs calls for every department; the
+    // Fen İşleri manager only files reports for his own department.
+    const managerChannel = category.departmentId === managerDepartmentId && random() < 0.5;
+    const channel = item.i % 15 === 0 ? 'citizen' : managerChannel ? 'manager' : 'admin';
     const source =
       channel === 'citizen' ? 'WEB' : channel === 'admin' ? 'CALL_CENTER' : 'MUNICIPAL_STAFF';
     const createdById = users.get(channel) ?? users.get('admin')!;

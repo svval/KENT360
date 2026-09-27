@@ -283,6 +283,15 @@ describe('Requests (e2e)', () => {
       await expect(
         t.prisma.request.update({ where: { id: r.id }, data: { slaDueAt: new Date() } }),
       ).rejects.toThrow();
+      // The reporter can only fall back to NULL (account deleted), never be replaced –
+      // not even in two steps via NULL.
+      await expect(
+        t.prisma.request.update({ where: { id: r.id }, data: { createdById: a.users.admin.id } }),
+      ).rejects.toThrow();
+      await t.prisma.request.update({ where: { id: r.id }, data: { createdById: null } });
+      await expect(
+        t.prisma.request.update({ where: { id: r.id }, data: { createdById: a.users.admin.id } }),
+      ).rejects.toThrow();
     });
 
     it('accepts a location outside all neighbourhoods, flagging it', async () => {
