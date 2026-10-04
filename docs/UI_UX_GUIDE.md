@@ -82,6 +82,19 @@ Rozet her zaman **metin içerir**; renk ikincil ipucudur (WCAG 1.4.1).
 | CLOSED                 | Kapandı             | neutral  |
 | REJECTED               | Reddedildi          | critical |
 
+| İş emri durumu | Etiket       | Ton      |
+| -------------- | ------------ | -------- |
+| CREATED        | Oluşturuldu  | neutral  |
+| ASSIGNED       | Atandı       | info     |
+| ACCEPTED       | Kabul Edildi | info     |
+| EN_ROUTE       | Yolda        | accent   |
+| ON_SITE        | Sahada       | accent   |
+| IN_PROGRESS    | Çalışılıyor  | warning  |
+| WAITING        | Beklemede    | warning  |
+| COMPLETED      | Tamamlandı   | success  |
+| VERIFIED       | Doğrulandı   | success  |
+| CANCELLED      | İptal Edildi | critical |
+
 | Öncelik  | Etiket | Ton      |     | SLA      | Etiket    | Ton      |
 | -------- | ------ | -------- | --- | -------- | --------- | -------- |
 | LOW      | Düşük  | neutral  |     | ON_TIME  | Zamanında | success  |
@@ -164,3 +177,13 @@ Phase 4 ekranları (`/settings/*`) ortak kalıpları kullanır:
 - **Gönderim yaşam döngüsü:** önce talep oluşturulur, sonra fotoğraflar tek tek (ilerleme çubuğuyla) yüklenir. Bir fotoğraf başarısız olursa talep silinmez; ekran hangi dosyanın yüklenemediğini gösterir, "Tekrar dene" ve "Fotoğraflar olmadan talebe git" sunar. Vatandaşın bildirimi hiçbir koşulda kaybolmaz.
 - **Detay (`/requests/[id]`):** başlıkta talep no + durum + öncelik; ana kolonda açıklama, fotoğraflar, konum, süreç (zaman çizelgesi, sonraki adım açık uçlu gösterilir); sağ panelde kategori, müdürlük, SLA, kaynak, oluşturulma, bildiren (yalnız yetkili personel). "İşlemler" kartı sunucunun `actions` listesinden oluşur; reddetme ve geri almada gerekçe zorunludur. Toast: "KNT-2026-000121 önceliği "Kritik" olarak güncellendi."
 - Fotoğraf URL'leri 5 dakikalıktır; detay 4 dakikada bir sessizce yenilenir.
+
+## 16. İş Emri ve Saha Ekranları (Phase 6)
+
+- **Liste (`/work-orders`):** İş Emri No · Kaynak Talep · Kategori · Mahalle · Müdürlük · Ekip · Personel · Öncelik · Durum · SLA · Oluşturulma. Filtreler URL'de (arama, durum, öncelik, müdürlük, ekip, ekip seçilince personel, tarih). `workOrders.read` olmayan kullanıcıda (saha personeli, ekip sorumlusu) başlık **"Görevlerim"**, müdürlük filtresi yok; ayrı bir uygulama değil, aynı ekran sadeleşir.
+- **Detay (`/work-orders/[id]`):** başlıkta `WO-…` + durum + öncelik + kaynak talep bağlantısı (talep okuma yetkisi olana). Ana kolon: Sorun (talep açıklaması, talimat, talep fotoğrafları) → **Önce / Sonra** → Çalışma sırasında galerisi → yapılan çalışma → konum → iş emri geçmişi. Sağ panel: bilgiler (müdürlük, ekip, personel, SLA), **Operasyon** kartı (yalnız sunucunun `actions` listesindeki adımlar), önemli tarihler, atama geçmişi.
+- **Önce / Sonra:** masaüstünde yan yana, dar ekranda alt alta; "önce" fotoğrafı yoksa talep fotoğrafı "(talep fotoğrafı)" etiketiyle gösterilir. Fotoğraflar tıklanınca basit bir lightbox (`Dialog`) açılır; ek kütüphane yok.
+- **Konum gerektiren adımlar:** diyalog, konumun alınacağını ve yarıçapı söyler; buton "Konum alınıyor…" durumuna geçer; izin reddi ve uzaklık hataları diyalogda Türkçe gösterilir.
+- **İşi Tamamla:** açıklama + "sonra" fotoğrafı seçimi (önizleme, kaldırma); buton ancak ikisi de sağlanınca aktif; başarıda toast "İş emri tamamlandı."
+- **Talep detayı:** `canCreateWorkOrder` ise "İş Emri Oluştur" (talimat alanı; vatandaşa gösterilmez); bağlı iş emirleri kartı (numara + durum rozeti).
+- **Saha ekipleri (`/field/teams`):** ekip, müdürlük, sorumlu, üye / açık iş / tamamlanan sayıları, durum; oluştur/düzenle diyaloğu (kod ve müdürlük sonradan salt okunur), üyeler diyaloğu (müdürlüğün saha personelinden ekleme, sorumlu seçimi, çıkarma).

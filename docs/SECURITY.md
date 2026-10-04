@@ -35,7 +35,10 @@ Durum: ✅ uygulandı · 🗓 planlandı (faz)
 - **Satır bazlı kurallar** (servis katmanında):
   - Talepler (Phase 5 ✅): sistem yöneticisi belediyenin tümünü, diğer personel kendi müdürlüğünü, herkes kendi bildirdiklerini görür; kapsam dışı → 404 (API_DESIGN §9).
   - Vatandaş yalnızca kendi taleplerini görür (`requests.readOwn`); yanıtlarda personel adları ve iç kullanıcı bilgisi yer almaz.
-  - Saha personeli yalnızca kendisine/ekibine atanmış iş emirlerini görür (`workOrders.readAssigned`).
+  - İş emirleri (Phase 6 ✅): yönetici tümünü, müdürlük yöneticisi kendi müdürlüğünü, ekip sorumlusu ve saha personeli kendisine/ekibine atananları görür (`workOrders.readAssigned`); kapsam dışı → 404, filtreler kapsamı genişletemez (API_DESIGN §10).
+  - Saha adımları ve fotoğraf yükleme yalnız işi yürüten kişiye (atanan / ekip / ekip sorumlusu); ekip sorumlusu yalnız kendi ekipleri arasında atama yapar; atanabilen kişi aynı belediyeden, aktif ve `workOrders.execute` sahibidir (rastgele kullanıcı / başka belediye / vatandaş ID'si reddedilir).
+  - İş emri durumu yalnız durum makinesinden geçer; iyimser eşzamanlılık (`WHERE status = …`) ve istemcinin `from` alanı eşzamanlı / bayat istekleri `409` ile reddeder. Tamamlama açıklaması ve AFTER fotoğrafı olmadan tamamlanamaz; tamamlanmış işin açıklaması ve fotoğrafları sessizce değiştirilemez (DB trigger).
+  - Konum doğrulaması sunucuda (PostGIS) yapılır; `FIELD_LOCATION_BYPASS` yalnız development/test içindir, production'da uygulama başlamaz ve kullanıldığında geçmişe yazılır.
   - Müdürlük yöneticisi kendi müdürlüğüyle sınırlıdır (System Admin hariç).
 - Frontend yalnızca gizler; **yetki kararı her zaman backend'dedir.**
 
@@ -47,10 +50,11 @@ Durum: ✅ uygulandı · 🗓 planlandı (faz)
 - **Rate limit:** Global 120/dk/IP ✅; hassas uçlar için özel limitler 🗓 ([API_DESIGN.md](API_DESIGN.md#6-rate-limit)). Çoklu instance'ta Redis storage'a geçilir.
 - **Web başlıkları:** Next.js `X-Frame-Options: DENY`, `Permissions-Policy` (kamera/konum yalnızca kendi origin), `poweredByHeader: false` ✅.
 
-## 5. Dosya Yükleme (Phase 5 ✅, iş emri kanıtı Phase 6)
+## 5. Dosya Yükleme (Phase 5 ✅, iş emri kanıtı Phase 6 ✅)
 
 - İzinli türler: **JPEG, PNG, WEBP**. Tür dosyanın **ilk baytlarındaki imzadan** (magic byte) belirlenir; bildirilen `Content-Type` imzayla uyuşmalıdır, uzantı ve dosya adı hiç kullanılmaz (GIF'i `.jpg` diye göndermek → `415`).
-- Boyut sınırı: **10 MB/dosya** (multer sınırı → `413 PAYLOAD_TOO_LARGE`), talep başına **5** fotoğraf.
+- Boyut sınırı: **10 MB/dosya** (multer sınırı → `413 PAYLOAD_TOO_LARGE`), talep başına **5** fotoğraf; iş emrinde tür (BEFORE / DURING / AFTER) başına **5**.
+- Tek hat: `ImageUploadService` – talep ve iş emri fotoğrafları aynı doğrulama/normalizasyon/depolama kodundan geçer; iş emri key'i `municipalities/{mid}/work-orders/{id}/{type}/{uuid}.{ext}`.
 - Object key tamamen sunucuda üretilir: `municipalities/{municipalityId}/requests/{requestId}/{uuid}.{ext}` → path traversal ve üzerine yazma imkânsız.
 - Bucket **private**; imzasız erişim `403`. Erişim, talep erişim kontrolünden sonra verilen **5 dakikalık** presigned URL ile (`MEDIA_URL_TTL_SECONDS`). Kalıcı URL saklanmaz; `storage_key` doğruluk kaynağıdır.
 - Veritabanı kaydı başarısız olursa yüklenen nesneler silinir.

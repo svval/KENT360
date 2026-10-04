@@ -83,11 +83,20 @@ Durum: ✅ tamamlandı · 🟡 kısmen · ⬜ planlandı
 - ✅ **Testler:** unit (durum makinesi, SLA, dosya imzası, kapsam, yıl) + e2e (numara eşzamanlılığı / yıl / belediye, yönlendirme, SLA snapshot, kapsamlar, filtreler, iş akışı, geçmiş/audit, medya güvenliği)
 - ⏭ Harita üzerinden konum seçimi → Phase 9 (MapLibre); mükerrer tespiti ve AI → Phase 11
 
-## Phase 6 – İş Emirleri
+## Phase 6 – İş Emirleri ✅
 
-- Talepten iş emri, ekip/personel ataması (geçmiş korunur), iş emri durum makinesi
-- Konum doğrulama, AFTER fotoğrafı zorunluluğu, talep↔iş emri senkronu
-- **Seed:** 8 saha ekibi, 40+ iş emri, önce/sonra fotoğraflı demo senaryosu (KNT-2026-001248 / WO-2026-000883)
+- ✅ Talepten iş emri (`WO-2026-000001`, `NumberingService`), talep başına tek aktif iş emri (satır kilidi + kısmi unique index)
+- ✅ Saha ekipleri (müdürlüğe bağlı, üyeler aynı müdürlüğün aktif saha personeli, tek sorumlu, pasifleştirme), `/field-teams` API
+- ✅ Ekip/personel ataması, yeniden atama (geçmiş korunur), uygulama içi atama bildirimi
+- ✅ İş emri durum makinesi (tek kaynak), işi yürüten kuralı, iyimser eşzamanlılık, `from` ile bayat istek tespiti
+- ✅ Talep ↔ iş emri senkronu (tek yön, aynı transaction, vatandaşa dönük zaman çizelgesi); `VERIFIED → CLOSED` elle
+- ✅ Saha yakınlığı: PostGIS mesafesi, belediye ayarı (`onSiteRadiusMeters`), reddedilen denemenin kaydı, yalnız dev/test bypass
+- ✅ BEFORE / DURING / AFTER kanıtları (Phase 5 görüntü hattı), tamamlamada açıklama + AFTER zorunlu, tamamlanmış kanıtın değişmezliği
+- ✅ Kapsamlar: yönetici / müdürlük / ekip sorumlusu / saha personeli; audit olayları
+- ✅ Web: `/work-orders` (tablo, URL filtreleri, saha personeline "Görevlerim"), `/work-orders/[id]` (Önce | Sonra karşılaştırma, lightbox, operasyon kartı, "İşi Tamamla"), talep detayında "İş Emri Oluştur", `/field/teams`
+- ✅ **Seed:** 5 saha ekibi, 45 iş emri (tüm durumlar), programatik önce/sonra fotoğrafları
+- ✅ **Testler:** unit (durum makinesi, kapsam, yürütücü, yakınlık, senkron tablosu, ekip kuralları) + e2e (numara eşzamanlılığı, tekrar oluşturma yarışı, atama/yeniden atama, eşzamanlı atama/tamamlama, bayat geçiş, kapsamlar, yakınlık, medya, tamamlama, doğrulama, senkron, audit, seed idempotency)
+- ⏭ Saha360 mobil uygulaması aynı API ile → Phase 12; bildirim gelen kutusu → Phase 13; harita üzerinde iş emirleri → Phase 9
 
 ## Phase 7 – Web Temeli ✅
 

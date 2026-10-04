@@ -5,7 +5,7 @@ _Akıllı Belediye Operasyon ve Kent Zekâsı Platformu_
 
 KENT360 manages the full lifecycle of a municipal service request — from a citizen's photo and map pin, through AI-assisted triage, duplicate detection and department routing, to field-crew work orders with before/after evidence — and turns that operational data into neighbourhood-level urban intelligence.
 
-> **Status:** Phases 0–5 and 7 complete – infrastructure, authentication / RBAC / audit, the municipality domain and **request management** (numbering, routing, SLA snapshot, workflow, timeline, private photo storage, scoped access) with its web screens. Next: Phase 6 (work orders). See the [roadmap](docs/DEVELOPMENT_ROADMAP.md).
+> **Status:** Phases 0–7 complete – infrastructure, authentication / RBAC / audit, the municipality domain, **request management** and **work orders & field operations** (field teams, assignment history, work order state machine, request ↔ work order sync, PostGIS on-site check, before/during/after evidence, scoped access) with their web screens. Next: Phase 8. See the [roadmap](docs/DEVELOPMENT_ROADMAP.md).
 
 ---
 
@@ -136,7 +136,7 @@ Idempotent development seed (`apps/api/prisma/seed.ts`, safe to re-run; refuses 
 npm run db:seed
 ```
 
-Seeds the RBAC catalogue (29 permissions, 5 system roles with their default permission sets from `@kent360/shared-types`), the demo municipality and accounts, 5 departments, a two-level request category tree (routing, priority and SLA defaults) and 5 neighbourhoods. Existing records are never overwritten. It also creates **120 deterministic demo requests** (last 90 days, marked "(Demo kaydı)", created once). Work orders follow in Phase 6.
+Seeds the RBAC catalogue (29 permissions, 5 system roles with their default permission sets from `@kent360/shared-types`), the demo municipality and accounts, 5 departments, a two-level request category tree (routing, priority and SLA defaults) and 5 neighbourhoods. Existing records are never overwritten. It also creates **120 deterministic demo requests** (last 90 days, marked "(Demo kaydı)", created once) and, for Phase 6, **5 field teams** with 6 extra demo field staff and **45 demo work orders** in every status, with programmatically drawn before/after photos uploaded to the private bucket (MinIO must be running).
 
 > **Demo geometry:** the neighbourhood names are real, but their boundaries are simple placeholder rectangles near Şahinbey centre – **not official boundaries**. Replace them with real data via _Ayarlar → Mahalle Sınırları → GeoJSON İçe Aktar_ (`POST /api/v1/neighborhoods/import`). See [DATABASE_DESIGN.md §9](docs/DATABASE_DESIGN.md#9-belediye-domaini-phase-4).
 
@@ -202,7 +202,7 @@ The e2e suites run against a separate `kent360_test` database on the same Postgr
 | 3     | Authentication, RBAC & audit                                  | ✅     |
 | 4     | Municipality domain + seed                                    | ✅     |
 | 5     | Request management, workflow, SLA                             | ✅     |
-| 6     | Work orders, teams, before/after                              | ⬜     |
+| 6     | Work orders, teams, before/after                              | ✅     |
 | 7     | Web foundation (layout, design system, login)                 | ✅     |
 | 8     | Management UI                                                 | ⬜     |
 | 9     | GIS: map, clustering, heatmap                                 | ⬜     |

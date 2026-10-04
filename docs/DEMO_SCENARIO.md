@@ -19,15 +19,17 @@ Seed mahalleleri: Karataş, Akkent, Güneykent, Dumlupınar, Binevler – **isim
 | Field Staff        | `field@kent360.local`   | `Kent360!Demo` | Ahmet Kaya (Fen İşleri – Ekip 1) |
 | Citizen            | `citizen@kent360.local` | `Kent360!Demo` | Vatandaş                         |
 
+Phase 6 ek saha personeli (hepsi `Kent360!Demo`, Saha Personeli rolü): `mehmet.yilmaz@` (Fen İşleri – Ekip 2 sorumlusu), `hasan.celik@` (Ekip 2), `ayse.koc@` / `emre.aydin@` (Park ve Bahçeler – Merkez Ekip), `fatma.ozturk@` (Temizlik – Ekip 1), `burak.kurt@` (Zabıta – Merkez Ekip) – alan adı `kent360.local`.
+
 ## Hazır Kayıtlar
 
-| Kayıt            | Değer                                                                                                                                         |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| Hikâye talebi    | `KNT-2026-001248` – Karataş Mahallesi, yol çukuru                                                                                             |
-| Hikâye iş emri   | `WO-2026-000883` – Fen İşleri – Ekip 1, Ahmet Kaya                                                                                            |
-| AI önerisi       | Kategori: Yol ve Kaldırım / Yol Çukuru · Müdürlük: Fen İşleri · Öncelik: Yüksek · Risk: Orta · Güven: %94                                     |
-| Duplicate örneği | Karataş'ta 55 m uzakta, 3 saat önce açılmış benzer çukur talebi (skor ≈ 0.84)                                                                 |
-| Arka plan verisi | 120 demo talep (Phase 5 ✅: son 90 gün, tüm kategoriler, SLA içinde / riskte / aşılmış, vatandaş hesabının 8 talebi); 40+ iş emri Phase 6 ile |
+| Kayıt            | Değer                                                                                                                                            |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Hikâye talebi    | `KNT-2026-001248` – Karataş Mahallesi, yol çukuru                                                                                                |
+| Hikâye iş emri   | `WO-2026-000883` – Fen İşleri – Ekip 1, Ahmet Kaya                                                                                               |
+| AI önerisi       | Kategori: Yol ve Kaldırım / Yol Çukuru · Müdürlük: Fen İşleri · Öncelik: Yüksek · Risk: Orta · Güven: %94                                        |
+| Duplicate örneği | Karataş'ta 55 m uzakta, 3 saat önce açılmış benzer çukur talebi (skor ≈ 0.84)                                                                    |
+| Arka plan verisi | 120 demo talep (Phase 5 ✅) · 5 saha ekibi ve 45 iş emri (Phase 6 ✅: 28 doğrulanmış, 17 açık – oluşturuldu … tamamlandı; önce/sonra fotoğraflı) |
 
 ## Akış
 
@@ -84,4 +86,12 @@ Sahne 2'nin fotoğraf + konum + açıklama ile talep oluşturma bölümü (AI ö
 2. `manager@kent360.local` → **Talepler** (Fen İşleri kapsamı) → talep → **İncelemeye al** → **Müdürlüğe ata**; öncelik değişikliği; zaman çizelgesi güncellenir.
 3. `citizen@kent360.local` aynı talepte güncel durumu ve süreci görür (personel adları olmadan).
 
-Harita üzerinden nokta seçimi Phase 9'da, AI önerisi ve mükerrer uyarısı Phase 11'de, iş emri akışı Phase 6'da eklenecek.
+## Phase 6 ile çalışan kısım (Sahne 3–5, web)
+
+1. `manager@kent360.local` → incelemedeki bir Fen İşleri talebi → **Müdürlüğe ata** → **İş Emri Oluştur** (talimat) → `WO-2026-…` detayı → **Ekibe / personele ata**: _Fen İşleri – Ekip 1 / Ahmet Kaya_ → toast _"WO-2026-…, Fen İşleri – Ekip 1 / Ahmet Kaya için atandı."_
+2. `field@kent360.local` → **Görevlerim** → iş emri → **Kabul et** → **Yola çık** → **Sahaya vardım** (tarayıcı konumu; uzaktaysa _"İş emri konumuna henüz yeterince yakın değilsiniz (… m; en fazla 150 m)."_) → "Önce" fotoğrafı → **İşe başla** → **İşi tamamla** (açıklama + "Sonra" fotoğrafı) → _"İş emri tamamlandı."_ Talep vatandaş için "Çözüldü".
+3. `manager@kent360.local` → iş emri → **Önce / Sonra** karşılaştırması → **Doğrula** → talepte **Talebi kapat**.
+
+Demo bilgisayarı belediye sınırında değilse konum adımı reddedilir – bu beklenen davranıştır. Sunumda tarayıcının konum simülasyonu (DevTools → Sensors) veya yalnız geliştirme ortamında `.env`'de `FIELD_LOCATION_BYPASS=true` kullanılabilir (geçmişe "Konum kontrolü geliştirme modunda atlandı" yazılır). Mobil Saha360 Phase 12'de aynı API ile gelir.
+
+Harita üzerinden nokta seçimi Phase 9'da, AI önerisi ve mükerrer uyarısı Phase 11'de eklenecek.

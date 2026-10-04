@@ -41,16 +41,16 @@ Hata:
 - `requestId`, `x-request-id` yanıt header'ı ve sunucu log'larıyla aynıdır (destek taleplerinde kullanılır).
 - 5xx hatalarında iç hata mesajı/stack **asla** dönmez.
 
-| HTTP      | `code`                                                                       | Durum                                             |
-| --------- | ---------------------------------------------------------------------------- | ------------------------------------------------- |
-| 400       | `VALIDATION_FAILED`                                                          | DTO doğrulaması; `details` alan mesajları listesi |
-| 401       | `UNAUTHORIZED`                                                               | Token yok / geçersiz / süresi dolmuş              |
-| 403       | `FORBIDDEN`                                                                  | Yetki yok ya da başka belediyenin kaydı           |
-| 404       | `NOT_FOUND`, `REQUEST_NOT_FOUND`, `WORK_ORDER_NOT_FOUND`                     |                                                   |
-| 409       | `CONFLICT`, `INVALID_STATUS_TRANSITION`                                      | Domain kuralı ihlali                              |
-| 413 / 415 | `PAYLOAD_TOO_LARGE`, `IMAGE_DIMENSIONS_TOO_LARGE` / `UNSUPPORTED_MEDIA_TYPE` | Dosya yükleme                                     |
-| 429       | `RATE_LIMITED`                                                               |                                                   |
-| 503       | `SERVICE_UNAVAILABLE`                                                        | Bağımlılık erişilemiyor                           |
+| HTTP      | `code`                                                                                | Durum                                             |
+| --------- | ------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| 400       | `VALIDATION_FAILED`                                                                   | DTO doğrulaması; `details` alan mesajları listesi |
+| 401       | `UNAUTHORIZED`                                                                        | Token yok / geçersiz / süresi dolmuş              |
+| 403       | `FORBIDDEN`                                                                           | Yetki yok ya da başka belediyenin kaydı           |
+| 404       | `NOT_FOUND`, `REQUEST_NOT_FOUND`, `WORK_ORDER_NOT_FOUND`                              |                                                   |
+| 409       | `CONFLICT`, `INVALID_STATUS_TRANSITION`, `WORK_ORDER_STALE`, `FIELD_LOCATION_TOO_FAR` | Domain kuralı ihlali, eşzamanlı değişiklik        |
+| 413 / 415 | `PAYLOAD_TOO_LARGE`, `IMAGE_DIMENSIONS_TOO_LARGE` / `UNSUPPORTED_MEDIA_TYPE`          | Dosya yükleme                                     |
+| 429       | `RATE_LIMITED`                                                                        |                                                   |
+| 503       | `SERVICE_UNAVAILABLE`                                                                 | Bağımlılık erişilemiyor                           |
 
 ## 2. Kimlik Doğrulama
 
@@ -160,17 +160,28 @@ Hata kodları: `CATEGORY_NOT_FOUND`, `CATEGORY_INACTIVE`, `CATEGORY_NOT_SELECTAB
 | POST  | `/requests/:id/join`  | Phase 11 – mevcut bildirime katıl                        |
 | GET   | `/requests/map?bbox=` | Phase 9 – GeoJSON                                        |
 
-### Work Orders & Field (Phase 6)
+### Work Orders & Field (Phase 6) ✅
 
-| Metot          | Yol                                 | İzin                                                                                  |
-| -------------- | ----------------------------------- | ------------------------------------------------------------------------------------- |
-| POST           | `/work-orders`                      | `workOrders.create` (talepten)                                                        |
-| GET            | `/work-orders` · `/work-orders/:id` | `workOrders.read` / `workOrders.readAssigned`                                         |
-| GET            | `/work-orders/mine`                 | `workOrders.readAssigned` – mobil görev listesi                                       |
-| POST           | `/work-orders/:id/assign`           | `workOrders.assign` – `{ fieldTeamId?, assigneeId?, note? }`                          |
-| POST           | `/work-orders/:id/transitions`      | `workOrders.execute` / `complete` / `verify` – `{ to, latitude?, longitude?, note? }` |
-| POST           | `/work-orders/:id/media`            | `workOrders.execute` – `type=BEFORE                                                   | DURING | AFTER` |
-| GET/POST/PATCH | `/field-teams`                      | `fieldTeams.read` / `fieldTeams.manage`                                               |
+| Metot | Yol                                     | İzin                                                                                                                                                                                                                              |
+| ----- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST  | `/work-orders`                          | `workOrders.create` – `{ requestId, instructions? }` (audit: `WORK_ORDER_CREATED`). Talep `ASSIGNED_TO_DEPARTMENT` olmalı; numara, müdürlük, öncelik, SLA ve konum talepten **sunucuda** kopyalanır; talep → `WORK_ORDER_CREATED` |
+| GET   | `/work-orders`                          | `workOrders.read` **veya** `workOrders.readAssigned` – kapsama göre daraltılır (§10). Mobil "görevlerim" listesi de budur (ayrı `/mine` ucu yok)                                                                                  |
+| GET   | `/work-orders/:id`                      | aynı – kapsam dışı / başka belediye → `404 WORK_ORDER_NOT_FOUND`                                                                                                                                                                  |
+| POST  | `/work-orders/:id/assignment`           | `workOrders.assign` – `{ fieldTeamId?, assignedUserId?, note? }` (en az biri; audit: `WORK_ORDER_ASSIGNED` / `WORK_ORDER_REASSIGNED`); atanan kişiye uygulama içi bildirim                                                        |
+| POST  | `/work-orders/:id/transitions`          | `workOrders.execute` / `complete` / `verify` / `create` (geçişe göre) – `{ to, from?, reason?, completionDescription?, latitude?, longitude? }`                                                                                   |
+| POST  | `/work-orders/:id/media`                | `workOrders.execute` + işi yürüten kişi – multipart `type=BEFORE\|DURING\|AFTER` + `files` (audit: `WORK_ORDER_MEDIA_ADDED`)                                                                                                      |
+| GET   | `/work-orders/:id/media/:mediaId/url`   | iş emrini görebilen – yeni kısa ömürlü URL                                                                                                                                                                                        |
+| GET   | `/field-teams` · `/field-teams/:id`     | `fieldTeams.read` – yönetici: tümü · personel: kendi müdürlüğü. Liste: üye / açık iş / tamamlanan iş sayıları (tek gruplu sorgu); detay: üyeler                                                                                   |
+| POST  | `/field-teams`                          | `fieldTeams.manage` – `{ departmentId, name, code }` (yalnız kendi müdürlüğü; audit: `FIELD_TEAM_CREATED`)                                                                                                                        |
+| PATCH | `/field-teams/:id`                      | `fieldTeams.manage` – `{ name?, status? }`; kod ve müdürlük değişmez; açık işi olan ekip pasifleştirilemez → `409 FIELD_TEAM_HAS_ACTIVE_WORK` (audit: `FIELD_TEAM_UPDATED`)                                                       |
+| PUT   | `/field-teams/:id/members`              | `fieldTeams.manage` – `{ members: [{ userId, role: LEADER\|MEMBER }] }` (tam liste; en fazla bir LEADER; audit: `FIELD_TEAM_MEMBERS_CHANGED`)                                                                                     |
+| GET   | `/field-teams/candidates?departmentId=` | `fieldTeams.manage` – müdürlüğün ekiplere eklenebilecek aktif saha personeli                                                                                                                                                      |
+
+Genel `PATCH /work-orders/:id` **yoktur**. Liste parametreleri: `page`, `pageSize`, `sort` (`createdAt`, `slaDueAt`, `priority`, `publicNumber`, `status`; varsayılan `-createdAt`), `status` / `priority` (çoklu), `departmentId`, `fieldTeamId`, `assignedUserId`, `neighborhoodId`, `createdFrom`, `createdTo`, `search` (tam `WO-…` veya `KNT-…` numarası; yoksa numara parçası, talep açıklaması, adres).
+
+Detay yanıtı: kaynak talep (no, durum, açıklama, fotoğraflar – bildiren kişi bilgisi **yok**), kategori, mahalle, müdürlük, ekip, personel, konum (snapshot), SLA (kaynak talebin snapshot'ı; iş tamamlanınca durur), `media[]` (`type` ile, presigned URL), `assignments[]` (atama geçmişi), `timeline[]` (iç süreç, personel adlarıyla), `completionDescription`, `cancellationReason`, önemli tarihler, `actions` (`transitions[]` – `requiresReason / requiresLocation / requiresCompletion` ile, `canAssign`, `canUploadMedia[]`) ve `proximity: { radiusMeters, bypass }`.
+
+Hata kodları: `WORK_ORDER_NOT_FOUND` (404), `WORK_ORDER_ALREADY_EXISTS` (409 – talebin aktif iş emri var), `REQUEST_NOT_READY_FOR_WORK_ORDER` (409), `REQUEST_HAS_ACTIVE_WORK_ORDER` (409 – aktif iş emri varken talep yeniden yönlendirilemez), `INVALID_STATUS_TRANSITION` (409, `details: { from, to, allowed }`), `WORK_ORDER_STALE` (409 – eşzamanlı değişiklik veya `from` uyuşmazlığı), `WORK_ORDER_NOT_ASSIGNABLE` (409), `NOT_WORK_ORDER_EXECUTOR` (403), `TRANSITION_REASON_REQUIRED` (400), `COMPLETION_DESCRIPTION_REQUIRED` (400), `AFTER_PHOTO_REQUIRED` (409), `FIELD_LOCATION_REQUIRED` (400), `FIELD_LOCATION_TOO_FAR` (409, `details: { distanceMeters, radiusMeters }`), `MEDIA_TYPE_NOT_ALLOWED` (409), `MEDIA_LIMIT_REACHED` (409, tür başına 5), `ASSIGNEE_INVALID` (409), `FIELD_TEAM_NOT_FOUND` (404), `FIELD_TEAM_INACTIVE` (409), `FIELD_TEAM_CODE_TAKEN` (409), `FIELD_TEAM_MEMBER_INVALID` (400), `FIELD_TEAM_HAS_ACTIVE_WORK` (409); medya hataları talep fotoğraflarıyla aynıdır.
 
 ### Analytics / Reports / Notifications / Audit (Phase 8–13)
 
@@ -193,7 +204,7 @@ POST /api/v1/work-orders/{id}/transitions
 { "to": "ON_SITE", "latitude": 37.0585, "longitude": 37.3710 }
 ```
 
-Sunucu: (1) izin, (2) kiracı, (3) durum makinesi, (4) iş kuralları (AFTER fotoğrafı, konum yakınlığı) kontrol eder; ardından tek transaction'da durumu, zaman damgasını, history'yi, gerekirse bağlı talebi ve audit log'u yazar. Geçersiz geçiş → `409 INVALID_STATUS_TRANSITION`, `details: { from, to, allowed: [...] }`.
+Sunucu: (1) izin, (2) kiracı ve nesne kapsamı, (3) işi yürüten kişi mi (saha adımları), (4) durum makinesi, (5) iş kuralları (gerekçe, konum yakınlığı, tamamlama açıklaması, AFTER fotoğrafı) kontrol eder; ardından tek transaction'da durumu, zaman damgasını, iş emri geçmişini, audit log'u ve – senkron kuralı gerektiriyorsa – bağlı talebi (durum + vatandaşa dönük zaman çizelgesi + audit) yazar. Durum güncellemesi iyimser eşzamanlılıkla yapılır (`WHERE status = <okunan>`); iki eşzamanlı istekten biri `409` alır. İstemci gördüğü durumu `from` ile gönderebilir; farklıysa `409 WORK_ORDER_STALE`. Geçersiz geçiş → `409 INVALID_STATUS_TRANSITION`, `details: { from, to, allowed: [...] }`.
 
 ## 6. Rate Limit
 
@@ -269,4 +280,18 @@ RBAC izni tek başına yetmez; her talep sorgusu kullanıcının kapsamıyla dar
 | Diğer personel (`requests.read`)                                    | kendi müdürlüğüne yönlendirilmiş talepler (müdürlüğü yoksa: hiçbiri) |
 | Talep oluşturabilen herkes (`requests.create` / `requests.readOwn`) | kendi bildirdiği talepler                                            |
 
-Kurallar toplanır (bir müdür kendi müdürlüğünü ve kendi bildirdiklerini görür). Filtre parametreleri kapsamın **içinde** uygulanır; `?departmentId=…` ile kapsam genişletilemez. Medya uçları aynı kontrolü tekrar uygular. Saha personeli (Phase 6) iş emri ataması üzerinden daha dar bir kapsam alacak.
+Kurallar toplanır (bir müdür kendi müdürlüğünü ve kendi bildirdiklerini görür). Filtre parametreleri kapsamın **içinde** uygulanır; `?departmentId=…` ile kapsam genişletilemez. Medya uçları aynı kontrolü tekrar uygular.
+
+## 10. İş Emri Erişim Kapsamı (Phase 6)
+
+| Kullanıcı                                                  | Görebildiği iş emirleri                                     |
+| ---------------------------------------------------------- | ----------------------------------------------------------- |
+| System Admin (`workOrders.read`, müdürlük kısıtı yok)      | belediyenin tüm iş emirleri                                 |
+| Müdürlük yöneticisi (`workOrders.read`)                    | kendi müdürlüğünün iş emirleri                              |
+| Ekip sorumlusu, saha personeli (`workOrders.readAssigned`) | kendisine atananlar + aktif üyesi olduğu ekiplere atananlar |
+
+Filtreler kapsamın içinde uygulanır (`?assignedUserId=<başkası>` kapsamı genişletmez, boş liste döner); kapsam dışı iş emri, fotoğrafı ve fotoğraf URL'si `404`. Yazma kuralları ayrıca:
+
+- **Saha adımları** (kabul, yola çıkma, sahaya varış, başlama, bekleme, devam, tamamlama, fotoğraf) yalnız **işi yürütene** açıktır: atanan kişi; kişi atanmamışsa ekibin aktif üyeleri; ekibin sorumlusu. Aynı ekipteki başka bir üye `403 NOT_WORK_ORDER_EXECUTOR`.
+- **Atama:** `workOrders.assign`; ekip sorumlusu (`workOrders.read` olmadan) yalnız sorumlusu olduğu ekiplerin işini yine o ekiplere atar. Hedef ekip aktif ve iş emrinin müdürlüğünde; hedef kişi aynı belediyede, aktif, saha yetkili (`workOrders.execute`) ve ekibin aktif üyesi (ekipsiz atamada aynı müdürlükten) olmalı.
+- **Doğrulama / geri gönderme** `workOrders.verify`, **iptal** `workOrders.create` (müdürlük yöneticisi, yönetici).

@@ -126,26 +126,41 @@ NEW ──► AI_ANALYZED ──► UNDER_REVIEW ──► ASSIGNED_TO_DEPARTMEN
 | WORK_ORDER_CREATED     | IN_PROGRESS, ASSIGNED_TO_DEPARTMENT (tüm iş emirleri iptal edildiyse) |
 | IN_PROGRESS            | RESOLVED                                                              |
 | RESOLVED               | VERIFIED, IN_PROGRESS (çözüm kabul edilmedi)                          |
-| VERIFIED               | CLOSED                                                                |
+| VERIFIED               | CLOSED (elle, `requests.update` – Phase 6)                            |
 | CLOSED, REJECTED       | — (terminal)                                                          |
 
 `NEW → CLOSED` gibi kısa devre geçişler reddedilir (`INVALID_STATUS_TRANSITION`). Her geçiş `request_history`'ye, kritik geçişler ayrıca `audit_logs`'a yazılır.
 
 ### 6.2 İş Emri Durum Makinesi
 
-| Kaynak              | Hedefler              | Kural                                                                      |
-| ------------------- | --------------------- | -------------------------------------------------------------------------- |
-| CREATED             | ASSIGNED, CANCELLED   | Atama: ekip ve/veya personel                                               |
-| ASSIGNED            | ACCEPTED, CANCELLED   | Yeniden atama durum değiştirmez, yeni `work_order_assignments` satırı açar |
-| ACCEPTED            | EN_ROUTE, CANCELLED   |                                                                            |
-| EN_ROUTE            | ON_SITE               | Konum doğrulama (bkz. 6.4)                                                 |
-| ON_SITE             | IN_PROGRESS           |                                                                            |
-| IN_PROGRESS         | WAITING, COMPLETED    | COMPLETED için en az bir **AFTER** fotoğrafı zorunlu                       |
-| WAITING             | IN_PROGRESS           | Malzeme/izin bekleme                                                       |
-| COMPLETED           | VERIFIED, IN_PROGRESS | Yönetici doğrular veya geri gönderir                                       |
-| VERIFIED, CANCELLED | —                     | terminal                                                                   |
+Tek doğruluk kaynağı: `apps/api/src/modules/work-orders/domain/work-order-status.machine.ts` (birim testli).
 
-**Talep ↔ iş emri senkronu:** İlk iş emri `IN_PROGRESS` olunca talep `IN_PROGRESS`; talebin tüm aktif iş emirleri `COMPLETED` olunca talep `RESOLVED`; hepsi `VERIFIED` olunca talep `VERIFIED`. Bu geçişler aynı DB transaction'ında yapılır.
+| Kaynak              | Hedefler              | Kim / kural                                                                               |
+| ------------------- | --------------------- | ----------------------------------------------------------------------------------------- |
+| CREATED             | ASSIGNED, CANCELLED   | ASSIGNED yalnız atama ucuyla; iptal yönetici (`workOrders.create`), gerekçe zorunlu       |
+| ASSIGNED            | ACCEPTED, CANCELLED   | kabul: işi yürüten (atanan kişi / ekip / ekip sorumlusu)                                  |
+| ACCEPTED            | EN_ROUTE, CANCELLED   |                                                                                           |
+| EN_ROUTE            | ON_SITE               | **konum doğrulama** (§6.4)                                                                |
+| ON_SITE             | IN_PROGRESS           | **konum doğrulama**; `startedAt` ilk başlamada yazılır                                    |
+| IN_PROGRESS         | WAITING, COMPLETED    | bekleme gerekçeli; COMPLETED için `completionDescription` + en az bir **AFTER** fotoğrafı |
+| WAITING             | IN_PROGRESS           | devam: **konum doğrulama**                                                                |
+| COMPLETED           | VERIFIED, IN_PROGRESS | doğrulama veya gerekçeli geri gönderme (`workOrders.verify`)                              |
+| VERIFIED, CANCELLED | —                     | terminal (DB trigger da reddeder)                                                         |
+
+**Atama / yeniden atama:** `CREATED → ASSIGNED`; `ASSIGNED` aynı kalır; `ACCEPTED` iken başka kişiye atanırsa `ASSIGNED`'a döner (yeni kişi kabul eder); `WAITING` korunur (yeni kişi sahada devam ettirir). `EN_ROUTE / ON_SITE / IN_PROGRESS` iken yeniden atama yoktur – iş önce beklemeye alınır; böylece sahadaki konum kanıtı işi yapan kişiye aittir. Her atama yeni bir `work_order_assignments` satırıdır, önceki satır `unassigned_at` ile kapanır.
+
+**Talep ↔ iş emri senkronu** (tek yön: iş emri talebi ilerletir; `requests/domain/work-order-sync.ts`, `RequestWorkOrderSync`): bir talebin aynı anda en fazla **bir** aktif iş emri olur (kısmi unique index), bu yüzden "tüm iş emirleri" kuralı tek iş emrine indirgenir.
+
+| İş emri adımı                  | Talep                                            | Vatandaşın gördüğü                                  |
+| ------------------------------ | ------------------------------------------------ | --------------------------------------------------- |
+| oluşturuldu                    | ASSIGNED_TO_DEPARTMENT → WORK_ORDER_CREATED      | "Talebiniz için saha iş emri oluşturuldu."          |
+| işe başlandı / devam (ilk kez) | WORK_ORDER_CREATED → IN_PROGRESS                 | "Saha ekibi çalışmaya başladı."                     |
+| tamamlandı                     | IN_PROGRESS → RESOLVED (`resolvedAt`, SLA durur) | "Saha çalışması tamamlandı, sorun giderildi."       |
+| doğrulandı                     | RESOLVED → VERIFIED                              | "Çözüm belediye tarafından doğrulandı."             |
+| geri gönderildi                | RESOLVED → IN_PROGRESS (`resolvedAt` temizlenir) | "Çözüm yeniden ele alındı, saha çalışması sürüyor." |
+| iptal edildi                   | WORK_ORDER_CREATED → ASSIGNED_TO_DEPARTMENT      | "İş emri iptal edildi; …yeniden planlanacak."       |
+
+`VERIFIED → CLOSED` ayrı ve elle yapılan bir talep adımıdır (müdürlük talebi kapatır). Senkron, iş emri değişikliğinin **aynı transaction'ında** çalışır: talep satırı kilitlenir, durum iyimser eşzamanlılıkla güncellenir, talep zaman çizelgesi ve audit yazılır; herhangi biri başarısız olursa iş emri değişikliği de geri alınır. Aktif iş emri varken talep başka müdürlüğe yönlendirilemez (`409 REQUEST_HAS_ACTIVE_WORK_ORDER`).
 
 ### 6.3 SLA
 
@@ -157,9 +172,11 @@ NEW ──► AI_ANALYZED ──► UNDER_REVIEW ──► ASSIGNED_TO_DEPARTMEN
   - `ON_TIME` – diğer durumlar
 - Öncelik sıralaması: `CRITICAL > HIGH > NORMAL > LOW`, eşitlikte `slaDueAt` en yakın olan önce.
 
-### 6.4 Konum Doğrulama (Saha360)
+### 6.4 Konum Doğrulama (saha yakınlığı)
 
-`ON_SITE` ve `IN_PROGRESS` geçişlerinde cihaz konumu gönderilirse iş emri noktasına `ST_DistanceSphere` ile mesafe ölçülür. Varsayılan eşik 150 m (`settings.onSiteRadiusMeters`). Eşik aşılırsa geçiş reddedilir ("İş emri konumuna henüz yeterince yakın değilsiniz.") ve `LOCATION_CHECK_FAILED` olayı history'ye yazılır. Konum izni olmayan development ortamı için Saha360'ta mock konum sağlayıcısı bulunacaktır (Phase 12).
+`ON_SITE`, `ON_SITE → IN_PROGRESS` ve `WAITING → IN_PROGRESS` adımlarında cihaz konumu (`latitude, longitude`) **zorunludur** (`400 FIELD_LOCATION_REQUIRED`). Uzaklık PostGIS ile iş emrinin **snapshot** noktasına ölçülür (`ST_DistanceSphere`, `municipality_id` filtresiyle); eşik belediye ayarı `settings.onSiteRadiusMeters` (10–5000 m, varsayılan 150 m). Eşik aşılırsa geçiş `409 FIELD_LOCATION_TOO_FAR` ile reddedilir ("İş emri konumuna henüz yeterince yakın değilsiniz (… m; en fazla … m).") ve deneme ayrı bir transaction'da `LOCATION_CHECK_FAILED` olayı + `WORK_ORDER_LOCATION_REJECTED` audit kaydıyla saklanır. Başarılı adımda ölçülen mesafe ve cihaz konumu iş emri geçmişine yazılır.
+
+Geliştirme/demo için `FIELD_LOCATION_BYPASS=true` konum olmadan veya uzaktan geçişe izin verir; bu **gizli değildir** (geçmişe "Konum kontrolü geliştirme modunda atlandı" yazılır, detayda `proximity.bypass` döner) ve env doğrulaması **production'da reddeder**. Web istemcisi her adımda taze konum ister (`maximumAge: 0`). Saha360 (Phase 12) aynı ucu kullanır.
 
 ## 7. Mükerrer Talep Tespiti (MVP algoritması)
 
@@ -205,7 +222,8 @@ interface AIProvider {
 ## 9. Dosya Depolama
 
 - Uygulama yalnızca **S3 protokolü** ile konuşur (`@aws-sdk/client-s3`); MinIO ↔ AWS S3 ↔ diğer S3 uyumlu servisler arasında geçiş env değişikliğidir.
-- Object key sunucuda üretilir: `{municipalityId}/{requests|work-orders}/{yyyy}/{mm}/{uuid}.{ext}`. İstemci dosya adı asla kullanılmaz.
+- Object key sunucuda üretilir: `municipalities/{municipalityId}/requests/{requestId}/{uuid}.{ext}` ve `municipalities/{municipalityId}/work-orders/{workOrderId}/{before|during|after}/{uuid}.{ext}`. İstemci dosya adı asla kullanılmaz.
+- Tek yükleme hattı: `ImageUploadService` (imza → normalizeImage → private bucket → DB transaction, hata olursa nesneler silinir); talep ve iş emri fotoğrafları aynı hattan geçer.
 - Bucket private'tır; istemciye kısa ömürlü presigned URL verilir.
 
 ## 10. Teknoloji ve Sürüm Kararları

@@ -103,20 +103,20 @@ DO UPDATE SET last_value = number_sequences.last_value + 1, updated_at = now()
 RETURNING last_value;
 ```
 
-Bu ifade talebi oluşturan transaction içinde çalışır; transaction geri alınırsa numara da geri alınır (boşluk oluşmaz). Sayaç belediye bazlı olduğundan numara **belediye içinde** tekildir: `UNIQUE (municipality_id, public_number)` (iki belediye de `KNT-2026-000001`'e sahip olabilir). Uygulama: `NumberingService` (`src/modules/numbering`), iş emirleri (Phase 6) aynı servisi kullanacak. Test: 25 eşzamanlı talep ardışık ve tekrarsız numara alır. Biçimlendirme saf fonksiyondur: `formatPublicNumber()` (`src/common/utils/public-number.ts`, birim testli). Yıl, belediyenin saat diliminde hesaplanır (31 Aralık 23:30 Türkiye saati → yeni yıl değil).
+Bu ifade talebi oluşturan transaction içinde çalışır; transaction geri alınırsa numara da geri alınır (boşluk oluşmaz). Sayaç belediye bazlı olduğundan numara **belediye içinde** tekildir: `UNIQUE (municipality_id, public_number)` (iki belediye de `KNT-2026-000001`'e sahip olabilir). Uygulama: `NumberingService` (`src/modules/numbering`); iş emirleri (`WORK_ORDER` kapsamı, `WO-2026-000001`) aynı servisi kullanır. Test: 25 eşzamanlı talep ardışık ve tekrarsız numara alır. Biçimlendirme saf fonksiyondur: `formatPublicNumber()` (`src/common/utils/public-number.ts`, birim testli). Yıl, belediyenin saat diliminde hesaplanır (31 Aralık 23:30 Türkiye saati → yeni yıl değil).
 
 ## 6. Index Stratejisi
 
-| Tablo                                | Index                                                                                                                                                  | Kullanım                                            |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------- |
-| requests                             | `(municipality_id, status)`, `status`, `priority`, `category_id`, `department_id`, `neighborhood_id`, `created_at`, `sla_due_at`, `created_by_id`      | Liste filtreleri, dashboard sayaçları, "taleplerim" |
-| requests                             | **GIST** `location`                                                                                                                                    | Harita bbox, yakın kayıt                            |
-| requests                             | **GIN trigram** `description`, `address`                                                                                                               | Arama ve metin benzerliği                           |
-| work_orders                          | `(municipality_id, status)`, `status`, `(assigned_user_id, status)`, `field_team_id`, `department_id`, `request_id`, `created_at`, **GIST** `location` | Mobil "görevlerim", ekip yükü                       |
-| neighborhoods                        | **GIST** `boundary`                                                                                                                                    | Point-in-polygon                                    |
-| request_history / work_order_history | `(parent_id, created_at)`                                                                                                                              | Zaman çizelgesi                                     |
-| notifications                        | `(user_id, read_at, created_at)`                                                                                                                       | Okunmamış bildirim sayacı                           |
-| audit_logs                           | `(municipality_id, created_at)`, `(entity_type, entity_id)`, `(user_id, created_at)`, `action`                                                         | Audit ekranı filtreleri                             |
+| Tablo                                | Index                                                                                                                                                                                                                                                                                                                            | Kullanım                                                                                           |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| requests                             | `(municipality_id, status)`, `status`, `priority`, `category_id`, `department_id`, `neighborhood_id`, `created_at`, `sla_due_at`, `created_by_id`                                                                                                                                                                                | Liste filtreleri, dashboard sayaçları, "taleplerim"                                                |
+| requests                             | **GIST** `location`                                                                                                                                                                                                                                                                                                              | Harita bbox, yakın kayıt                                                                           |
+| requests                             | **GIN trigram** `description`, `address`                                                                                                                                                                                                                                                                                         | Arama ve metin benzerliği                                                                          |
+| work_orders                          | `(municipality_id, created_at DESC)`, `(municipality_id, department_id, created_at DESC)`, `(assigned_user_id, status)`, `(field_team_id, status)`, `(municipality_id, status)`, `status`, `department_id`, `request_id`, `created_at`, **GIST** `location`; kısmi unique `request_id WHERE status NOT IN (VERIFIED, CANCELLED)` | Yönetici/müdürlük listesi, "görevlerim", ekip kapsamı ve sayaçları, talep başına tek aktif iş emri |
+| neighborhoods                        | **GIST** `boundary`                                                                                                                                                                                                                                                                                                              | Point-in-polygon                                                                                   |
+| request_history / work_order_history | `(parent_id, created_at)`                                                                                                                                                                                                                                                                                                        | Zaman çizelgesi                                                                                    |
+| notifications                        | `(user_id, read_at, created_at)`                                                                                                                                                                                                                                                                                                 | Okunmamış bildirim sayacı                                                                          |
+| audit_logs                           | `(municipality_id, created_at)`, `(entity_type, entity_id)`, `(user_id, created_at)`, `action`                                                                                                                                                                                                                                   | Audit ekranı filtreleri                                                                            |
 
 ## 7. Veritabanı Seviyesi Kurallar
 
@@ -255,4 +255,36 @@ Geçiş tablosunun tamamı `request-status.machine.ts`'te tanımlıdır; her ge�
 
 ### Demo veri
 
-`prisma/seed-requests.ts`: 120 talep, deterministik (sabit tohumlu üreteç), bir kez oluşturulur (zaman çizelgesinde `demoSeed` işareti), son 90 güne yayılmış, açıklamalarda "(Demo kaydı)". Geçmişte kapanmış talepler iş emri kaydı olmadan kapatılmıştır – iş emri verisi Phase 6'da gelir. Talep numaraları sıra sayacından gelir ve **geri alınmaz**: geliştirme veritabanında eski demo kayıtları silinip yeniden seed edildiğinde numaralar kaldığı yerden devam eder (ör. `KNT-2026-000122…000241`); audit kayıtları append-only olduğu için silinmez.
+`prisma/seed-requests.ts`: 120 talep, deterministik (sabit tohumlu üreteç), bir kez oluşturulur (zaman çizelgesinde `demoSeed` işareti), son 90 güne yayılmış, açıklamalarda "(Demo kaydı)". Phase 6 seed'i bu kapanmış taleplerin 28'ine doğrulanmış iş emri ekler (bkz. §11). Talep numaraları sıra sayacından gelir ve **geri alınmaz**: geliştirme veritabanında eski demo kayıtları silinip yeniden seed edildiğinde numaralar kaldığı yerden devam eder (ör. `KNT-2026-000122…000241`); audit kayıtları append-only olduğu için silinmez.
+
+## 11. İş Emirleri ve Saha Ekipleri (Phase 6)
+
+### Oluşturma
+
+İş emri yalnız `ASSIGNED_TO_DEPARTMENT` durumundaki bir talepten, talep satırı `SELECT … FOR UPDATE` ile kilitlenerek oluşturulur. Sunucu talepten kopyalar: `department_id`, `priority`, `title`, `sla_due_at` ve **konum snapshot'ı** (`latitude`, `longitude`, `address`; `location` trigger'la üretilir). Numara `NumberingService` (`WORK_ORDER` kapsamı) ile aynı transaction'da alınır; talep durumu, talep zaman çizelgesi (`WORK_ORDER_CREATED`), iş emri geçmişi ve audit aynı transaction'dadır.
+
+### Atama ve geçmiş
+
+`work_orders.field_team_id` / `assigned_user_id` güncel atamadır (hızlı sorgu için); `work_order_assignments` tüm geçmişi tutar (her atama yeni satır, önceki `unassigned_at` ile kapanır). `field_team_members` silinmez: ekipten çıkan üyenin `left_at` alanı dolar, yeniden eklenince temizlenir. `field_teams.leader_id` üyeler arasındaki `LEADER`'ı yansıtır.
+
+### Zaman çizelgesi ve denetim
+
+- `work_order_history` (iç süreç, personel adlarıyla): `CREATED`, `ASSIGNED`, `REASSIGNED`, `ACCEPTED`, `EN_ROUTE`, `ON_SITE`, `STARTED`, `WAITING`, `RESUMED`, `MEDIA_ADDED`, `COMPLETED`, `VERIFIED`, `RETURNED`, `CANCELLED`, `LOCATION_CHECK_FAILED`; konum doğrulanan adımlarda cihaz konumu ve `metadata.distanceMeters`.
+- `request_history`: talebe yansıyan anlamlı olaylar, vatandaşa dönük metinle (ARCHITECTURE §6.2).
+- `audit_logs`: `WORK_ORDER_CREATED`, `WORK_ORDER_ASSIGNED`, `WORK_ORDER_REASSIGNED`, `WORK_ORDER_STATUS_CHANGED`, `WORK_ORDER_MEDIA_ADDED`, `WORK_ORDER_COMPLETED`, `WORK_ORDER_VERIFIED`, `WORK_ORDER_CANCELLED`, `WORK_ORDER_LOCATION_REJECTED`, `FIELD_TEAM_CREATED`, `FIELD_TEAM_UPDATED`, `FIELD_TEAM_MEMBERS_CHANGED` (+ senkronda `REQUEST_STATUS_CHANGED`).
+- Atamada atanan kişiye (yoksa ekip sorumlusuna) `notifications` satırı (`WORK_ORDER_ASSIGNED`, uygulama içi; gelen kutusu arayüzü Phase 13).
+
+### Kanıt fotoğrafları
+
+`work_order_media.type`: `BEFORE` (sahada / çalışırken), `DURING` (çalışırken / beklemede), `AFTER` (çalışırken); tür başına en fazla 5. Key: `municipalities/{mid}/work-orders/{workOrderId}/{before|during|after}/{uuid}.{ext}`; talep fotoğraflarıyla aynı hat (`ImageUploadService` → `normalizeImage`).
+
+### DB kuralları (`20260928000000_work_orders`)
+
+- Aynı kiracı: iş emrinin talebi, müdürlüğü, ekibi (ekip ayrıca **aynı müdürlükten**) ve atanan kişisi; ekibin müdürlüğü ve sorumlusu; ekip üyesinin kullanıcısı (trigger'lar).
+- Talep başına tek aktif iş emri: `work_orders_one_active_per_request` kısmi unique index'i (Prisma bu index'i ifade edemez; migration diff'i etkilemez).
+- Değişmezler: `public_number`, `municipality_id`, `request_id`, `created_at`, **konum**; `COMPLETED`/`VERIFIED` iken `completion_description`; `VERIFIED` ve `CANCELLED` terminal. `COMPLETED`/`VERIFIED` için boş olmayan `completion_description` (CHECK).
+- `work_order_media` append-only: güncellenemez; iş emri `COMPLETED / VERIFIED / CANCELLED` iken yeni fotoğraf eklenemez.
+
+### Demo veri
+
+`prisma/seed-work-orders.ts`: 5 ekip (Fen İşleri – Ekip 1/2, Park ve Bahçeler – Merkez Ekip, Temizlik – Ekip 1, Zabıta – Merkez Ekip), 6 ek demo saha personeli, **45 iş emri** (`WO-2026-000001…000045`): 28 doğrulanmış (daha önce kapanmış taleplerde) + 17 açık (CREATED 2, ASSIGNED 3, ACCEPTED 2, EN_ROUTE 1, ON_SITE 2, IN_PROGRESS 3, WAITING 2, COMPLETED 2). Bağlı talepler API'nin yapacağı gibi ilerletilir. Önce/sonra fotoğrafları programatik çizilir (indirilmiş görsel yok) ve `normalizeImage`'dan geçer. Deterministik ve idempotent (`demoSeed: phase6-v1`); e2e `seed.e2e-spec.ts` iki kez çalıştırıp hiçbir şey eklenmediğini doğrular.
