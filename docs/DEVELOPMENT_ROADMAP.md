@@ -121,14 +121,24 @@ Durum: ✅ tamamlandı · 🟡 kısmen · ⬜ planlandı
 - ✅ Mahalle sınırları Phase 4 GeoJSON ucundan: ince çizgi, düşük opaklık, hover, tıklayınca ad; geliştirmede "Demo sınır geometrisi" notu
 - ⏭ Isı haritası ve mahalle choropleth'i → Phase 10 (MahallePulse metrikleriyle birlikte)
 
-## Phase 10 – MahallePulse
+## Phase 10 – MahallePulse ✅
 
-- Mahalle metrikleri, kategori dağılımı, 7/30/90 gün trendleri, kural tabanlı anomali tespiti (son 30 gün ortalamasına göre artış)
+- ✅ `/analytics/neighborhoods`, `/analytics/neighborhoods/:id`, `/analytics/anomalies`: mahalle metrikleri (toplam / açık / çözülen / kritik / açık iş emri / SLA aşımı / çözüm süresi / en sık kategori / 7–30 gün / önceki 30 gün), gruplu SQL, kapsamlı
+- ✅ Açıklanabilir risk skoru 0–100 (5 ağırlıklı bileşen, `riskFactors`), seviye LOW…CRITICAL – yapay zekâ değil
+- ✅ Kural tabanlı anomali: son 7 gün / önceki 4 haftanın haftalık ortalaması; en az 3 bildirim, ×1,5 ve +2 şartı
+- ✅ Web: `/neighborhoods` (Kent Zekâsı kartı + risk sıralı tablo), `/neighborhoods/[id]` (risk ve bileşenleri, KPI, kategori dağılımı, 30/90 gün trend, anomaliler, harita, açık talepler, aktif iş emirleri), dashboard "Kent Zekâsı" kartı
+- ✅ Harita: talep yoğunluğu ısı haritası ve mahalle risk choropleth'i (lejant, mahalle tıklamasında risk kartı)
+- ✅ Seed: seed anına göre 9 küçük "sinyal" talebi (anomali + mükerrer demosu), idempotent
 
-## Phase 11 – AI
+## Phase 11 – AI ✅
 
-- `AIProvider` arayüzü, `MockAIProvider` (kategori `keywords` + risk kuralları), analiz uç noktası, duplicate skoru (PostGIS + pg_trgm), "AI Önerisi" UI
-- **Testler:** mock sınıflandırıcı, duplicate skor bileşenleri
+- ✅ `AiProvider` arayüzü; `MockAiProvider` (deterministik, anahtarsız) ve `AnthropicAiProvider` (`@anthropic-ai/sdk`, `claude-opus-5`, yapılandırılmış çıktı, reddetme yedeği); hata/anahtarsızlıkta mock'a düşüş
+- ✅ `POST /requests/analyze` (kaydetmeden öneri + benzer bildirimler); talep oluşturulunca analiz ve eşleşmeler saklanır (kişisel veri maskelenir)
+- ✅ Mükerrer tespiti: PostGIS (150 m, GIST) + pg_trgm + kategori + zaman, açıklanabilir skor, otomatik birleştirme yok
+- ✅ `POST /requests/:id/join`: vatandaş mevcut talebe katılır (bir kez), takipçi olarak izler; katılımcı sayısı
+- ✅ Web: yeni talepte "AI ile analiz et" + "Öneriyi uygula", "Benzer bildirimler bulundu" kartı (Detayı gör / Bu talebe katıl / Yine de yeni talep oluştur); talep detayında personel için AI Analizi paneli
+- ✅ **Testler:** risk / anomali / sınıflandırıcı / PII maskeleme / mükerrer skoru / sağlayıcı yedeği (unit) + metrikler, kapsam, kiracı, anomali eşiği, analiz, mükerrer adayları (yakın / uzak / eski / kapalı / başka belediye / pg_trgm), katılma, saklama temizliği (e2e)
+- ⏭ Görüntü analizi ve AI isabet raporu → ileride; bildirimler Phase 13
 
 ## Phase 12 – Saha360 Mobil
 

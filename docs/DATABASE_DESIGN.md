@@ -297,3 +297,15 @@ Dashboard, harita ve arama yeni tablo veya index eklemez; mevcut verinin kapsaml
 - **KPI:** talepler için tek toplama sorgusu (`count(*) FILTER (…)`, `avg(resolved_at - created_at)`); açık iş emri sayısı Prisma `count`. Trend: oluşturma ve çözülme için birer `GROUP BY (… AT TIME ZONE <belediye saat dilimi>)::date`. Kritik liste: üç küçük sınırlı sorgu (CRITICAL / SLA aşıldı / SLA riskte), birleştirilip tekilleştirilir. N+1 yok.
 - **Harita:** `location && ST_MakeEnvelope(batı, güney, doğu, kuzey, 4326)` – GIST `location` index'i. `EXPLAIN ANALYZE` (demo veri): talep bbox + müdürlük sorgusu `requests_location_idx` ve `requests_department_id_idx` ile Bitmap Index Scan, ~2 ms. KPI toplaması 120 satırda sıralı tarama (0,25 ms); büyüyen veride `(municipality_id, created_at DESC)` index'i kullanılabilir. **Yeni index gerekmedi.**
 - **Arama:** talep ve iş emri liste sorgularının kendisi (trigram index'li `ILIKE`, tam numara eşleşmesi) – ayrı bir arama yapısı yok.
+
+## 13. MahallePulse ve AI (Phase 10–11)
+
+Yeni tablo veya migration yok; mevcut `ai_analyses`, `duplicate_matches`, `request_followers` ve `requests.supporter_count / ai_analyzed` kullanılır.
+
+- **MahallePulse** (`modules/operations/pulse.service.ts`): liste üç gruplu sorgudur – mahalle metrikleri (`neighborhoods LEFT JOIN requests` + `FILTER` toplamları), `DISTINCT ON` ile en sık kategori, açık iş emri sayıları. Anomaliler tek `GROUP BY neighborhood, category` sorgusu (son 35 gün). Detay: kategori dağılımı ve 90 günlük trend birer gruplu sorgu, açık talep / iş emri listeleri sınırlı (10). Risk skoru ve anomali kuralları saf fonksiyonlardır (`domain/neighborhood-risk.ts`, `domain/anomaly.ts`).
+- **Kapsam:** tüm sorgular talep / iş emri nesne kapsamını `scopeToSql` ile uygular; `municipality_id` her sorguda elle filtrelenir.
+- **AI saklama** (`ai_analyses`): `provider, model, suggested_category_id, suggested_department_id, priority_suggestion, confidence, latency_ms, accepted` (seçilen kategori = önerilen mi), `classification` = `{ categoryCode, matchedKeywords, fallback }`, `summary` = maskelenmiş tek cümle, `raw_response` = `{ reasoning }`. Açıklamanın tamamı, prompt ve kişisel veri saklanmaz.
+- **Mükerrer eşleşmeleri** (`duplicate_matches`): talep oluşturulurken skoru ≥ 0,35 olan en fazla 5 aday, bileşenleriyle (`SUGGESTED`).
+- **Katılım** (`request_followers` PK `(request_id, user_id)`): bir kullanıcı bir talebe bir kez katılır; `supporter_count` aynı transaction'da artar; zaman çizelgesine isimsiz `CITIZEN_JOINED` yazılır. Katılan vatandaş talebi `requestReadScope` takipçi kuralıyla görür.
+- **Demo:** `prisma/seed-pulse.ts` seed anına göre 9 yeni talep ekler (Karataş'ta 5 yol çukuru, Güneykent'te 4 çöp) – bir kez, `demoSeed: phase10-v1` – ve bunlara saklanmış analiz + mükerrer eşleşmeleri yazar. Böylece demo anomali ve mükerrer önerisi gerçek veriden üretilir.
+- **Performans:** demo veride analitik ve aday sorguları milisaniyeler içinde; aday sorgusu `requests_location_idx` (GIST) ile önce kutuya, sonra kesin mesafeye daraltılır; metin benzerliği `pg_trgm similarity()` yalnız bu küçük aday kümesinde hesaplanır.

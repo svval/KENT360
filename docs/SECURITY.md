@@ -96,7 +96,9 @@ Her kayıt: aktör, işlem, varlık türü/ID, önce/sonra, IP, user-agent, zama
 
 - **Minimizasyon:** yalnızca hizmet için gerekli veri toplanır; T.C. kimlik no, adres (konum dışında) istenmez.
 - **Amaçla sınırlılık:** vatandaş iletişim bilgisi yalnızca `users.read` izni olan personele gösterilir; saha personeli yalnızca konum ve talep içeriğini görür.
-- **AI sağlayıcısına** kişisel veri gönderilmez; `raw_response` temizlenerek saklanır.
+- **AI sağlayıcısına** kişisel veri gönderilmez (Phase 11 ✅): açıklama `maskPersonalData` ile maskelenir (e-posta, telefon, kimlik no, IBAN); ad, iletişim, konum gönderilmez. Saklanan analizde açıklamanın tamamı ve prompt yoktur; audit kaydında metin yoktur. AI gerekçesi ve analiz paneli yalnız personele döner.
+- **Mükerrer adayları:** kiracı izolasyonu her zaman; personel kendi talep kapsamında; vatandaş belediye genelindeki adayları yalnız kamuya açık alanlarla görür (numara, kategori, mesafe, yaş, skor – açıklama, adres, bildiren yok). Katılma bir kez, isimsiz zaman çizelgesi kaydı, katılan vatandaş talebi takipçi kuralıyla görür (`requests.readOwn`).
+- **MahallePulse:** `analytics.read` + `requests.read`; müdürlük yöneticisi kendi müdürlüğü; vatandaş ve saha personeli 403.
 - **Saklama:** kapatılan taleplerin fotoğrafları için belediye bazlı saklama süresi (`settings.mediaRetentionDays`) 🗓.
 
 ## 10. Secret Yönetimi ✅

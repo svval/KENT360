@@ -104,3 +104,13 @@ Harita üzerinden nokta seçimi Phase 9'da, AI önerisi ve mükerrer uyarısı P
 4. `manager@kent360.local` aynı ekranlarda yalnız Fen İşleri'ni, `field@kent360.local` haritada yalnız kendi ekibinin iş emirlerini görür; vatandaş dashboard'da kısayol panelini görür.
 
 Not: demo talepleri seed anına göre son 90 güne yayılır; seed'den günler sonra açık taleplerin çoğu SLA'yı aşmış görünür ve kritik katmanında yer alır. Taze bir görünüm için demo veritabanını yeniden seed'leyin. Altlık için internet bağlantısı gerekir (OpenFreeMap).
+
+## Phase 10–11 ile çalışan kısım (Sahne 2 ve 5)
+
+1. `citizen@kent360.local` → **Yeni Talep** → açıklama "Okulun önündeki yolda derin bir çukur var…" → **Demo konumu kullan** → **AI ile analiz et**: _Yol ve Kaldırım › Yol Çukuru · Fen İşleri · Yüksek · %84 güven_ → **Öneriyi uygula**.
+2. Aynı kartta **Benzer bildirimler bulundu**: Karataş'taki demo çukur bildirimi (`%95 benzer`, "… m uzakta · aynı kategori · … saat önce · metin %… benzer") → **Bu talebe katıl** → talep detayı, "Bu talebi takip ediyorsunuz".
+3. `admin@kent360.local` → **Dashboard → Kent Zekâsı**: "Karataş Mahallesi'nde yol çukuru bildirimleri son 7 günde 5 adet; önceki 4 haftada hiç yoktu." → **Mahalleler**: risk sıralı tablo → Karataş detayı (risk 0–100 ve bileşenleri, kategori dağılımı, trend, anomali, harita).
+4. **Canlı Harita** → "Talep yoğunluğu" ve "Mahalle riski" katmanları → bir mahalleye tıkla → risk kartı.
+5. Talep detayında (personel) **AI Analizi**: öneri, güven, seçilen kategoriyle aynı mı, olası benzer talepler.
+
+Not: anomali ve mükerrer demosu seed anına göre üretilen 9 talebe dayanır; seed'den haftalar sonra "son 7 gün" boşalır – taze demo için veritabanını yeniden seed'leyin. `AI_PROVIDER=anthropic` ve `AI_API_KEY` verilirse öneriler Claude'dan gelir; anahtar yoksa kural tabanlı sınıflandırıcı çalışır.

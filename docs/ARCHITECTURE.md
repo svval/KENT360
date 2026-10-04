@@ -196,6 +196,8 @@ WHERE ST_DWithin(r.location::geography, :point::geography, 150)
 | `textScore`     | `pg_trgm similarity(description, :text)` (GIN index)     | 0.25    |
 | `timeScore`     | `max(0, 1 − saat / 168)`                                 | 0.15    |
 
+**Uygulama (Phase 11 ✅):** `modules/ai/duplicate.service.ts` – aday sorgusu GIST index'ini kullanmak için önce geometri üzerinde `ST_DWithin(location, nokta, 0.0025°)`, ardından kesin `ST_DistanceSphere ≤ 150 m`; `municipality_id` filtresi, personelde talep kapsamı. Skor saf fonksiyon `domain/duplicate-score.ts` (birim testli); 0,35 altı gösterilmez. Hiçbir zaman otomatik birleştirme yapılmaz – vatandaş isterse `POST /requests/:id/join` ile mevcut talebe katılır.
+
 `duplicateScore ≥ 0.60` → "Muhtemel benzer kayıt bulundu." Örnek: 55 m, aynı kategori, %88 metin benzerliği, 3 saat önce → `0.35·0.63 + 0.25·1 + 0.25·0.88 + 0.15·0.98 ≈ 0.84`. Tüm bileşenler `duplicate_matches` tablosunda saklanır; ileride `textScore` embedding benzerliği ile değiştirilebilir (arayüz aynı kalır).
 
 ## 8. Yapay Zekâ Mimarisi
@@ -214,9 +216,10 @@ interface AIProvider {
 }
 ```
 
-- `AI_PROVIDER=mock` → **MockAIProvider**: kategori `keywords` alanı üzerinden kural tabanlı, deterministik ve açıklanabilir sonuç (API anahtarı gerekmez).
-- Gerçek sağlayıcı aynı arayüzü uygular ve `AIModule` içinde env ile seçilir.
-- Sağlayıcıya yalnızca açıklama ve fotoğraf gönderilir; kişisel veri (ad, telefon, e-posta) **gönderilmez**. `raw_response` saklanmadan önce temizlenir.
+- **Uygulanan arayüz (Phase 11 ✅, `modules/ai/ai-provider.ts`):** `analyzeRequest`, `suggestCategory`, `suggestPriority`, `summarize`. Görüntü analizi henüz yok.
+- `AI_PROVIDER=mock` → **MockAiProvider**: kategori `keywords` alanı üzerinden kural tabanlı, deterministik ve açıklanabilir sonuç (API anahtarı gerekmez); "okul / çocuk / tehlike" gibi ifadeler önceliği yükseltir, "yaralan / kaza / gaz kaçağı" kritik yapar. Güven 0,2 (eşleşme yok) … 0,95.
+- `AI_PROVIDER=anthropic` + `AI_API_KEY` → **AnthropicAiProvider**: resmi `@anthropic-ai/sdk`, model `AI_MODEL` (varsayılan `claude-opus-5`), tek kısa çağrı, yapılandırılmış JSON çıktı (`output_config.format`), düşük effort, sunucu tarafı reddetme yedeği (`fallbacks: "default"`). Anahtar yoksa, hata / zaman aşımı (`AI_TIMEOUT_MS`) / reddetme olursa `AiService` mock ile yanıtlar ve `fallback: true` döner – AI hiçbir zaman talep oluşturmayı bozmaz.
+- Sağlayıcıya yalnızca **maskelenmiş açıklama** ve kategori listesi gönderilir (`maskPersonalData`: e-posta, telefon, kimlik no, IBAN); ad, iletişim, konum **gönderilmez**. Saklanan analizde açıklama yoktur: kodlar, eşleşen kelimeler, maskelenmiş tek cümlelik özet ve kısa gerekçe.
 - Öneri `ai_analyses` tablosuna yazılır; insan kararından sonra `accepted` alanı doldurulur → sınıflandırıcı isabet oranı ölçülebilir.
 
 ## 9. Dosya Depolama

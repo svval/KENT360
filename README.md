@@ -5,7 +5,7 @@ _Akıllı Belediye Operasyon ve Kent Zekâsı Platformu_
 
 KENT360 manages the full lifecycle of a municipal service request — from a citizen's photo and map pin, through AI-assisted triage, duplicate detection and department routing, to field-crew work orders with before/after evidence — and turns that operational data into neighbourhood-level urban intelligence.
 
-> **Status:** Phases 0–9 complete – infrastructure, authentication / RBAC / audit, the municipality domain, **request management** and **work orders & field operations** (field teams, assignment history, work order state machine, request ↔ work order sync, PostGIS on-site check, before/during/after evidence, scoped access) with their web screens, plus the **operations dashboard** (scoped KPIs, 30-day trend, critical/recent requests), **global search** and the **MapLibre live map** (PostGIS bbox, clustering, neighbourhood layer). Next: Phase 10 (MahallePulse). See the [roadmap](docs/DEVELOPMENT_ROADMAP.md).
+> **Status:** Phases 0–11 complete – infrastructure, authentication / RBAC / audit, the municipality domain, **request management** and **work orders & field operations** (field teams, assignment history, work order state machine, request ↔ work order sync, PostGIS on-site check, before/during/after evidence, scoped access) with their web screens, plus the **operations dashboard** (scoped KPIs, 30-day trend, critical/recent requests), **global search** and the **MapLibre live map** (PostGIS bbox, clustering, neighbourhood layer). Phase 10–11 add **MahallePulse** (neighbourhood metrics, explainable 0–100 risk score, rule-based anomalies, heatmap and risk choropleth) and **AI assistance** (provider abstraction – deterministic mock by default, Claude via `AI_PROVIDER=anthropic` – category/priority suggestion, PostGIS + pg_trgm duplicate detection, joining an existing request). Next: Phase 12 (Saha360 mobile). See the [roadmap](docs/DEVELOPMENT_ROADMAP.md).
 
 ---
 
@@ -210,8 +210,8 @@ The e2e suites run against a separate `kent360_test` database on the same Postgr
 | 7     | Web foundation (layout, design system, login)                 | ✅                |
 | 8     | Management UI                                                 | ✅                |
 | 9     | GIS: map, clustering, heatmap                                 | ✅ (heatmap → 10) |
-| 10    | MahallePulse analytics                                        | ⬜                |
-| 11    | AI classification & duplicate detection                       | ⬜                |
+| 10    | MahallePulse analytics                                        | ✅                |
+| 11    | AI classification & duplicate detection                       | ✅                |
 | 12    | Saha360 mobile                                                | ⬜                |
 | 13    | Reports, notifications, audit UI                              | ⬜                |
 | 14    | Hardening & demo polish                                       | ⬜                |

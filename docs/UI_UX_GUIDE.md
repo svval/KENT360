@@ -195,3 +195,13 @@ Phase 4 ekranları (`/settings/*`) ortak kalıpları kullanır:
 - **Harita marker'ları:** talep = mavi daire, kritik (CRITICAL veya SLA aşıldı) = kırmızı eşkenar dörtgen + "!", iş emri = amber kare (talebinin yanına kaydırılmış), çözülmüş = küçük gri daire; kümeler lacivert daire + sayı. Lejant katman panelindedir ve marker'ın şeklini taşır.
 - **Harita yerleşimi:** `/map` sayfası tam genişlik; üstte filtre çubuğu (durum, öncelik, müdürlük, kategori, tarih – URL'de), sağ üstte katman paneli (sayılarla), sol altta seçim kartı, sağ altta zoom. Altlık yüklenemezse veya yapılandırılmamışsa açıklayıcı boş durum.
 - **Genel arama:** topbar'da; 250 ms debounce, en az 2 karakter; sonuçlar ikon + "Talep"/"İş Emri" etiketiyle; ↑/↓, Enter, Esc.
+
+## 18. MahallePulse ve AI (Phase 10–11)
+
+- **Risk** her zaman sayı + seviye etiketiyle gösterilir (`67 Yüksek risk`); seviye rozeti durum tonlarıyla (düşük yeşil, orta mavi, yüksek amber, kritik kırmızı). Skor büyüklüğü (çubuk, harita) tek renk ailesinde açıktan koyuya sıralı rampayla (`RISK_RAMP`). Skorun "kural tabanlı" olduğu ekranda yazılır; AI gibi sunulmaz.
+- **Anomali** cümle olarak verilir ve abartmaz ("son 7 günde normalin %82 üzerinde (5 bildirim; …)"); taban sıfırsa yüzde uydurulmaz ("önceki 4 haftada hiç yoktu").
+- **Kategori dağılımı** yatay çubuklar, tek renk, değer + yüzde yazılı.
+- **Harita:** "Talep yoğunluğu" (ısı haritası, mavi rampa) ve "Mahalle riski" (choropleth, amber→kırmızı rampa) katman panelinden açılır; risk lejantı 0–50–100. Mahalle tıklanınca risk kartı ve "MahallePulse detayı".
+- **AI önerisi:** otomatik değil, "AI ile analiz et" düğmesiyle; panelde kategori yolu, müdürlük, öncelik, güven yüzdesi, kısa gerekçe ve kaynak (kural tabanlı / model adı). "Öneriyi uygula" yalnız formu doldurur; kullanıcı değiştirebilir.
+- **Benzer bildirimler:** uyarı tonunda kart; her aday için numara, "%84 benzer", katılımcı sayısı, açıklama satırı ("55 m uzakta · aynı kategori · 3 saat önce · metin %88 benzer"); düğmeler "Detayı gör" (görebiliyorsa), "Bu talebe katıl" (vatandaş), "Yine de yeni talep oluştur".
+- **Talep detayı:** personel için "AI Analizi" kartı ("Öneri" rozeti, seçilen kategoriyle karşılaştırma, olası benzer talepler, "AI karar vermez" notu); vatandaşa gösterilmez. Katılan vatandaşa "Bu talebi takip ediyorsunuz" rozeti.

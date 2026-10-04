@@ -152,13 +152,17 @@ Detay yanıtı: kategori (+ ana kategori), müdürlük, mahalle, konum, `locatio
 
 Hata kodları: `CATEGORY_NOT_FOUND`, `CATEGORY_INACTIVE`, `CATEGORY_NOT_SELECTABLE` (alt kategorisi olan ana kategori), `CATEGORY_NOT_ROUTABLE`, `DEPARTMENT_INACTIVE`, `INVALID_STATUS_TRANSITION` (`details: { from, to, allowed }`), `TRANSITION_REASON_REQUIRED`, `REQUEST_CLOSED`, `MEDIA_LIMIT_REACHED`, `UNSUPPORTED_MEDIA_TYPE` (415; animasyonlu görüntü dahil), `PAYLOAD_TOO_LARGE` (413), `IMAGE_DIMENSIONS_TOO_LARGE` (413, `details: { index, width, height }`), `INVALID_IMAGE` (400, çözülemeyen/bozuk görüntü), `STORAGE_UNAVAILABLE` (503).
 
-### Requests – sonraki fazlar 🗓
+### AI ve mükerrer tespiti (Phase 11) ✅
 
-| Metot | Yol                   | Faz                                                      |
-| ----- | --------------------- | -------------------------------------------------------- |
-| POST  | `/requests/analyze`   | Phase 11 – AI önerisi + duplicate adayları (kaydetmeden) |
-| POST  | `/requests/:id/join`  | Phase 11 – mevcut bildirime katıl                        |
-| GET   | `/requests/map?bbox=` | Phase 9 – GeoJSON                                        |
+| Metot | Yol                  | İzin                                                                                                                                                                                                          |
+| ----- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST  | `/requests/analyze`  | `requests.create` – `{ description, latitude?, longitude?, categoryId? }`; **hiçbir şey saklanmaz**. Yanıt: `{ provider, model, fallback, suggestion, possibleDuplicates[] }` (60/saat)                       |
+| POST  | `/requests/:id/join` | `requests.create` – mevcut açık talebe katıl (audit: `REQUEST_JOINED`); bir kez (`409 ALREADY_JOINED`), kendi talebine değil (`409 CANNOT_JOIN_OWN_REQUEST`), sonuçlanmış talebe değil (`409 REQUEST_CLOSED`) |
+
+- `suggestion`: `category` (+ ana kategori), `department`, `priority`, `confidence` (0–1), kısa `reasoning`, `summary`. **Öneridir**: talep oluşturulurken istemci yine yalnız kendi seçtiği kategoriyi gönderir.
+- `possibleDuplicates[]` (en fazla 5): `requestId, publicNumber, categoryName, status, distanceMeters, ageMinutes, score, components{distance,category,text,time}, explanation ("55 m uzakta · aynı kategori · 3 saat önce · metin %88 benzer"), possibleDuplicate (score ≥ 0,60), supporterCount, canView`. Personel kendi talep kapsamındaki adayları görür; vatandaş belediye genelindeki adayları yalnız bu **kamuya açık alanlarla** görür (açıklama, adres, bildiren yok).
+- Talep oluşturulunca aynı analiz **saklanır** (`ai_analyses`, `duplicate_matches`, audit `REQUEST_AI_ANALYZED`); talep detayında `ai` (yalnız personel), `supporterCount`, `joined`.
+- Sağlayıcı: `AI_PROVIDER=mock` (varsayılan, anahtarsız, deterministik) veya `anthropic` (+ `AI_API_KEY`, `AI_MODEL` varsayılan `claude-opus-5`). Hata / zaman aşımı / reddetmede yanıt mock'tan gelir ve `fallback: true` olur.
 
 ### Work Orders & Field (Phase 6) ✅
 
@@ -197,17 +201,23 @@ Hata kodları: `WORK_ORDER_NOT_FOUND` (404), `WORK_ORDER_ALREADY_EXISTS` (409 �
 - **Harita özellikleri yalındır:** talep → `id, publicNumber, status, priority, category, department, neighborhood, slaStatus, critical, done, createdAt`; iş emri → `id, publicNumber, status, priority, department, team, assignedUser, requestId, requestNumber`. Açıklama, adres, bildiren gibi alanlar taşınmaz. En fazla 5000 nesne (en yeniler); fazlası varsa `"truncated": true` (yabancı üye).
 - Geçersiz `bbox` → `400`.
 
-### Analytics / Reports / Notifications / Audit (Phase 10–13)
+### MahallePulse (Phase 10) ✅
 
-| Metot | Yol                                                                                 | İzin                            |
-| ----- | ----------------------------------------------------------------------------------- | ------------------------------- |
-| GET   | `/analytics/overview`                                                               | `analytics.read` – KPI kartları |
-| GET   | `/analytics/trend` · `/analytics/categories` · `/analytics/departments`             | `analytics.read`                |
-| GET   | `/analytics/neighborhoods` · `/analytics/neighborhoods/:id`                         | `analytics.read` – MahallePulse |
-| GET   | `/analytics/anomalies`                                                              | `analytics.read`                |
-| GET   | `/reports/:type.csv`                                                                | `reports.export`                |
-| GET   | `/notifications` · PATCH `/notifications/:id/read` · POST `/notifications/read-all` | oturum                          |
-| GET   | `/audit`                                                                            | `audit.read`                    |
+| Metot | Yol                            | İzin                                                                                                                            |
+| ----- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| GET   | `/analytics/neighborhoods`     | `analytics.read` + `requests.read` – aktif mahalleler, risk skoruna göre azalan                                                 |
+| GET   | `/analytics/neighborhoods/:id` | aynı – `+ center, categories[], trend[90 gün], openRequests[10], activeWorkOrders[10], anomalies[]`; başka belediye / yok → 404 |
+| GET   | `/analytics/anomalies`         | aynı – kural tabanlı artışlar, güçlüden zayıfa                                                                                  |
+
+Mahalle başına: `total, open, resolved, critical` (açık + CRITICAL), `openWorkOrders, slaBreachPercent` (son 90 gün, SLA takipli taleplerde), `avgResolutionMinutes` (son 90 gün), `topCategory, last7, last30, previous30, changePercent, riskScore` (0–100), `riskLevel` (`LOW < 25 ≤ MEDIUM < 50 ≤ HIGH < 75 ≤ CRITICAL`), `riskFactors[]` (`key, label, value 0–1, points, detail`). Kapsam: yönetici belediye, müdürlük yöneticisi kendi müdürlüğü; vatandaş ve saha personeli 403. Isı haritası ayrı uç gerektirmez: `/map/requests` (bbox) verisini kullanır; choropleth bu listedeki `riskScore` değerleridir.
+
+### Reports / Notifications / Audit (Phase 13)
+
+| Metot | Yol                                                                                 | İzin             |
+| ----- | ----------------------------------------------------------------------------------- | ---------------- |
+| GET   | `/reports/:type.csv`                                                                | `reports.export` |
+| GET   | `/notifications` · PATCH `/notifications/:id/read` · POST `/notifications/read-all` | oturum           |
+| GET   | `/audit`                                                                            | `audit.read`     |
 
 ## 5. Durum Geçişi Uç Noktaları
 
