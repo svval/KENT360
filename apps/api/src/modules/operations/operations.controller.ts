@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   type DashboardOverview,
@@ -6,6 +6,9 @@ import {
   type MapFeatureCollection,
   type MapRequestProperties,
   type MapWorkOrderProperties,
+  type NeighborhoodPulse,
+  type NeighborhoodPulseDetail,
+  type PulseAnomaly,
   Permission,
   type SearchResultItem,
 } from '@kent360/shared-types';
@@ -15,7 +18,51 @@ import { RawResponse } from '../../common/decorators/raw-response.decorator';
 import { DashboardService } from './dashboard.service';
 import { MapRequestsQueryDto, MapWorkOrdersQueryDto, SearchQueryDto } from './dto/operations.dto';
 import { MapService } from './map.service';
+import { PulseService } from './pulse.service';
 import { SearchService } from './search.service';
+
+@ApiTags('Analytics')
+@ApiBearerAuth('access-token')
+@Controller('analytics')
+export class AnalyticsController {
+  constructor(private readonly pulse: PulseService) {}
+
+  @Get('neighborhoods')
+  @Permissions(Permission.ANALYTICS_READ, Permission.REQUESTS_READ)
+  @ApiOperation({
+    summary: 'MahallePulse: mahalle metrikleri ve açıklanabilir risk skoru (risk sırasına göre)',
+    description:
+      'Kapsam: yönetici belediye, müdürlük yöneticisi kendi müdürlüğü. Risk skoru kural tabanlıdır ' +
+      '(açık yoğunluk, SLA aşımı, kritik oran, artış, çözüm süresi) – riskFactors her bileşeni açıklar.',
+  })
+  neighborhoods(@CurrentUser() actor: AuthUser): Promise<NeighborhoodPulse[]> {
+    return this.pulse.list(actor);
+  }
+
+  @Get('neighborhoods/:id')
+  @Permissions(Permission.ANALYTICS_READ, Permission.REQUESTS_READ)
+  @ApiOperation({
+    summary:
+      'Mahalle detayı: KPI, kategori dağılımı, 90 günlük trend, açık talepler, iş emirleri, anomaliler',
+  })
+  neighborhood(
+    @CurrentUser() actor: AuthUser,
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ): Promise<NeighborhoodPulseDetail> {
+    return this.pulse.detail(actor, id);
+  }
+
+  @Get('anomalies')
+  @Permissions(Permission.ANALYTICS_READ, Permission.REQUESTS_READ)
+  @ApiOperation({
+    summary: 'Kural tabanlı anomaliler: son 7 gün / önceki 4 haftanın haftalık ortalaması',
+    description:
+      'En az 3 bildirim, ortalamanın en az 1,5 katı ve en az 2 fazla olmadan anomali üretilmez.',
+  })
+  anomalies(@CurrentUser() actor: AuthUser): Promise<PulseAnomaly[]> {
+    return this.pulse.anomalies(actor);
+  }
+}
 
 @ApiTags('Dashboard')
 @ApiBearerAuth('access-token')

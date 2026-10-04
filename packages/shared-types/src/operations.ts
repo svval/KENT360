@@ -86,3 +86,76 @@ export interface SearchResultItem {
   subtitle: string | null;
   status: RequestStatus | WorkOrderStatus;
 }
+
+// ─── MahallePulse (Phase 10) ─────────────────────────────────────────────────
+
+export type NeighborhoodRiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+
+export const NEIGHBORHOOD_RISK_LABELS: Record<NeighborhoodRiskLevel, string> = {
+  LOW: 'Düşük',
+  MEDIUM: 'Orta',
+  HIGH: 'Yüksek',
+  CRITICAL: 'Kritik',
+};
+
+export interface RiskFactor {
+  key: 'openLoad' | 'slaBreach' | 'criticalShare' | 'growth' | 'slowResolution';
+  label: string;
+  value: number;
+  points: number;
+  detail: string;
+}
+
+/** Metrics over the user's scope; windows are rolling (now − N days). */
+export interface NeighborhoodPulse {
+  id: string;
+  code: string;
+  name: string;
+  total: number;
+  open: number;
+  resolved: number;
+  /** Open and CRITICAL priority. */
+  critical: number;
+  openWorkOrders: number;
+  /** Share (0–100) of SLA-tracked requests of the last 90 days that breached; null = none tracked. */
+  slaBreachPercent: number | null;
+  avgResolutionMinutes: number | null;
+  topCategory: { id: string; name: string; count: number } | null;
+  last7: number;
+  last30: number;
+  previous30: number;
+  /** (last30 − previous30) / previous30 in %, null when previous30 is 0. */
+  changePercent: number | null;
+  riskScore: number;
+  riskLevel: NeighborhoodRiskLevel;
+  riskFactors: RiskFactor[];
+}
+
+export interface PulseAnomaly {
+  neighborhoodId: string;
+  neighborhoodName: string;
+  categoryId: string;
+  categoryName: string;
+  last7: number;
+  baselineWeekly: number;
+  increasePercent: number | null;
+  severity: 'MEDIUM' | 'HIGH';
+  message: string;
+}
+
+export interface NeighborhoodPulseDetail extends NeighborhoodPulse {
+  center: { latitude: number; longitude: number } | null;
+  categories: { id: string; name: string; count: number }[];
+  /** Last 90 local days, oldest first. */
+  trend: { date: string; created: number; resolved: number }[];
+  openRequests: RequestSummary[];
+  activeWorkOrders: {
+    id: string;
+    publicNumber: string;
+    status: WorkOrderStatus;
+    priority: Priority;
+    team: string | null;
+    requestNumber: string | null;
+  }[];
+  anomalies: PulseAnomaly[];
+}
