@@ -4,6 +4,7 @@ import {
   type MapRequestProperties,
   type MapWorkOrderProperties,
   type NeighborhoodFeatureCollection,
+  type NeighborhoodRiskLevel,
 } from '@kent360/shared-types';
 import type { GeoJSONSource, Map as MapLibreMap, MapLayerMouseEvent } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -11,7 +12,8 @@ import { CircleAlert, MapPinOff } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getNeighborhoodGeoJson } from '@/lib/api/municipality-domain';
-import { getMapRequests, getMapWorkOrders } from '@/lib/api/operations';
+import { RISK_RAMP } from '@/components/domain/pulse-parts';
+import { getMapRequests, getMapWorkOrders, listNeighborhoodPulse } from '@/lib/api/operations';
 import { mapConfig } from '@/lib/map-config';
 import { cn } from '@/lib/utils';
 import { ICON_PIXEL_RATIO, MARKER_COLORS, markerImages } from './map-icons';
@@ -21,6 +23,17 @@ export interface MapLayersState {
   critical: boolean;
   workOrders: boolean;
   neighborhoods: boolean;
+  /** Request density heatmap (Phase 10). */
+  heatmap: boolean;
+  /** Neighbourhood risk choropleth (MahallePulse score, Phase 10). */
+  risk: boolean;
+}
+
+export interface NeighborhoodRiskInfo {
+  riskScore: number;
+  riskLevel: NeighborhoodRiskLevel;
+  open: number;
+  slaBreachPercent: number | null;
 }
 
 export interface MapFilters {
@@ -35,7 +48,7 @@ export interface MapFilters {
 export type MapSelection =
   | { kind: 'request'; properties: MapRequestProperties }
   | { kind: 'workOrder'; properties: MapWorkOrderProperties }
-  | { kind: 'neighborhood'; name: string };
+  | { kind: 'neighborhood'; name: string; id?: string; risk?: NeighborhoodRiskInfo | null };
 
 export interface MapStats {
   requests: number;
@@ -49,6 +62,8 @@ interface OperationsMapProps {
   filters?: MapFilters;
   /** The user may see requests (requests.read); otherwise only work orders are loaded. */
   canSeeRequests: boolean;
+  /** MahallePulse scores for the choropleth (analytics.read). */
+  canSeeRisk?: boolean;
   /** Only open requests / work orders (dashboard). */
   openOnly?: boolean;
   center?: [number, number] | null;
@@ -64,6 +79,8 @@ const LAYER_IDS: Record<keyof MapLayersState, string[]> = {
   critical: ['critical-points'],
   workOrders: ['work-orders-points'],
   neighborhoods: ['neighborhoods-fill', 'neighborhoods-line'],
+  heatmap: ['requests-heat'],
+  risk: ['neighborhoods-risk'],
 };
 
 type Status = 'loading' | 'ready' | 'no-style' | 'unsupported' | 'style-error';
@@ -78,6 +95,7 @@ export function OperationsMap({
   layers,
   filters = {},
   canSeeRequests,
+  canSeeRisk = false,
   openOnly = false,
   center,
   zoom,
@@ -90,12 +108,21 @@ export function OperationsMap({
   const [status, setStatus] = useState<Status>(mapConfig.styleUrl ? 'loading' : 'no-style');
   const [loadError, setLoadError] = useState<string | null>(null);
   // Latest props for map event handlers registered once.
-  const latest = useRef({ filters, canSeeRequests, openOnly, onSelect, onStats, layers });
+  const latest = useRef({
+    filters,
+    canSeeRequests,
+    canSeeRisk,
+    openOnly,
+    onSelect,
+    onStats,
+    layers,
+  });
   // Updated after each render (handlers run later, never during render).
   useLayoutEffect(() => {
-    latest.current = { filters, canSeeRequests, openOnly, onSelect, onStats, layers };
+    latest.current = { filters, canSeeRequests, canSeeRisk, openOnly, onSelect, onStats, layers };
   });
   const reloadRef = useRef<() => void>(() => undefined);
+  const riskRef = useRef(new Map<string, NeighborhoodRiskInfo>());
 
   // ─── Create the map once ───────────────────────────────────────────────
   useEffect(() => {
@@ -179,6 +206,10 @@ export function OperationsMap({
             features: critical,
           });
           (map.getSource('work-orders') as GeoJSONSource | undefined)?.setData(workOrders);
+          (map.getSource('heat') as GeoJSONSource | undefined)?.setData({
+            type: 'FeatureCollection',
+            features: all,
+          });
           setLoadError(null);
           latest.current.onStats?.({
             requests: all.length - critical.length,
@@ -211,6 +242,7 @@ export function OperationsMap({
         });
         map.addSource('critical', { type: 'geojson', data: EMPTY });
         map.addSource('work-orders', { type: 'geojson', data: EMPTY });
+        map.addSource('heat', { type: 'geojson', data: EMPTY });
 
         map.addLayer({
           id: 'neighborhoods-fill',
@@ -221,11 +253,61 @@ export function OperationsMap({
             'fill-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.16, 0.06],
           },
         });
+        // Choropleth: MahallePulse risk 0–100 on a sequential ramp (feature-state "risk").
+        map.addLayer({
+          id: 'neighborhoods-risk',
+          type: 'fill',
+          source: 'neighborhoods',
+          paint: {
+            'fill-color': [
+              'interpolate',
+              ['linear'],
+              ['coalesce', ['feature-state', 'risk'], 0],
+              ...RISK_RAMP.flat(),
+            ],
+            'fill-opacity': [
+              'case',
+              ['==', ['feature-state', 'risk'], null],
+              0,
+              ['boolean', ['feature-state', 'hover'], false],
+              0.62,
+              0.45,
+            ],
+          },
+        });
         map.addLayer({
           id: 'neighborhoods-line',
           type: 'line',
           source: 'neighborhoods',
           paint: { 'line-color': MARKER_COLORS.request, 'line-width': 1.2, 'line-opacity': 0.7 },
+        });
+        // Density of requests (all statuses in the current filters) – one hue, light → dark.
+        map.addLayer({
+          id: 'requests-heat',
+          type: 'heatmap',
+          source: 'heat',
+          maxzoom: 17,
+          paint: {
+            'heatmap-weight': ['case', ['get', 'critical'], 1, 0.6],
+            'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 10, 0.6, 15, 1.4],
+            'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 10, 14, 15, 32],
+            'heatmap-opacity': 0.75,
+            'heatmap-color': [
+              'interpolate',
+              ['linear'],
+              ['heatmap-density'],
+              0,
+              'rgba(37,99,235,0)',
+              0.2,
+              '#BFDBFE',
+              0.45,
+              '#60A5FA',
+              0.7,
+              '#2563EB',
+              1,
+              '#1E3A8A',
+            ],
+          },
         });
         map.addLayer({
           id: 'requests-clusters',
@@ -336,12 +418,21 @@ export function OperationsMap({
             );
             return;
           }
-          const area = map!
-            .queryRenderedFeatures(e.point, { layers: ['neighborhoods-fill'] })
-            .find(Boolean);
+          const areaLayers = ['neighborhoods-fill', 'neighborhoods-risk'].filter(
+            (id) => map!.getLayoutProperty(id, 'visibility') !== 'none',
+          );
+          const area =
+            areaLayers.length > 0
+              ? map!.queryRenderedFeatures(e.point, { layers: areaLayers }).find(Boolean)
+              : undefined;
           latest.current.onSelect?.(
-            area && map!.getLayoutProperty('neighborhoods-fill', 'visibility') !== 'none'
-              ? { kind: 'neighborhood', name: String(area.properties.name) }
+            area
+              ? {
+                  kind: 'neighborhood',
+                  id: String(area.id ?? area.properties.id),
+                  name: String(area.properties.name),
+                  risk: riskRef.current.get(String(area.id ?? area.properties.id)) ?? null,
+                }
               : null,
           );
         });
@@ -352,6 +443,18 @@ export function OperationsMap({
         try {
           const areas: NeighborhoodFeatureCollection = await getNeighborhoodGeoJson();
           (map.getSource('neighborhoods') as GeoJSONSource | undefined)?.setData(areas as never);
+          if (latest.current.canSeeRisk) {
+            const pulse = await listNeighborhoodPulse();
+            for (const n of pulse) {
+              riskRef.current.set(n.id, {
+                riskScore: n.riskScore,
+                riskLevel: n.riskLevel,
+                open: n.open,
+                slaBreachPercent: n.slaBreachPercent,
+              });
+              map.setFeatureState({ source: 'neighborhoods', id: n.id }, { risk: n.riskScore });
+            }
+          }
         } catch {
           // Boundaries are context only; markers still work without them.
         }

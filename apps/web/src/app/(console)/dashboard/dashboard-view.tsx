@@ -15,11 +15,13 @@ import {
   Map as MapIcon,
   ShieldCheck,
   Siren,
+  Sparkles,
   Timer,
   type LucideIcon,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
+import { AnomalyList } from '@/components/domain/pulse-parts';
 import { QueryError } from '@/components/domain/query-states';
 import { SlaIndicator } from '@/components/domain/sla-indicator';
 import { PriorityBadge, RequestStatusBadge } from '@/components/domain/status-badges';
@@ -40,7 +42,12 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TD, TH, THead, TR } from '@/components/ui/table';
 import { TodayLabel } from '@/components/ui/today-label';
-import { getDashboardOverview, operationsKeys } from '@/lib/api/operations';
+import {
+  getDashboardOverview,
+  listAnomalies,
+  operationsKeys,
+  pulseKeys,
+} from '@/lib/api/operations';
 import { cn, formatDateTime, formatNumber } from '@/lib/utils';
 import { useAuth } from '@/providers/auth-provider';
 
@@ -150,7 +157,14 @@ export function DashboardView() {
 }
 
 function OperationsDashboard() {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
+  const canSeeAnalytics = hasPermission(Permission.ANALYTICS_READ);
+  const anomalies = useQuery({
+    queryKey: pulseKeys.anomalies,
+    queryFn: listAnomalies,
+    enabled: canSeeAnalytics,
+    refetchInterval: REFRESH_MS,
+  });
   const query = useQuery({
     queryKey: operationsKeys.dashboard,
     queryFn: getDashboardOverview,
@@ -161,6 +175,8 @@ function OperationsDashboard() {
     critical: true,
     workOrders: true,
     neighborhoods: true,
+    heatmap: false,
+    risk: false,
   });
   const [selection, setSelection] = useState<MapSelection | null>(null);
   const [stats, setStats] = useState<MapStats | null>(null);
@@ -204,6 +220,7 @@ function OperationsDashboard() {
             className="h-[420px]"
             layers={layers}
             canSeeRequests
+            canSeeRisk={canSeeAnalytics}
             openOnly
             center={center}
             zoom={municipality?.mapZoom ?? null}
@@ -213,12 +230,53 @@ function OperationsDashboard() {
           <LayerControl
             layers={layers}
             onChange={setLayers}
-            available={['requests', 'critical', 'workOrders', 'neighborhoods']}
+            available={[
+              'requests',
+              'critical',
+              'workOrders',
+              'neighborhoods',
+              ...(canSeeAnalytics ? (['risk'] as const) : []),
+            ]}
             stats={stats}
           />
           {selection && <SelectionCard selection={selection} onClose={() => setSelection(null)} />}
         </div>
       </Card>
+
+      {canSeeAnalytics && (
+        <Card>
+          <CardHeader>
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="size-4 text-accent" aria-hidden="true" />
+                Kent Zekâsı
+              </CardTitle>
+              <CardDescription>
+                MahallePulse: son 7 günde olağan dışı artan sorunlar (kural tabanlı)
+              </CardDescription>
+            </div>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/neighborhoods">
+                MahallePulse
+                <ArrowRight aria-hidden="true" />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {anomalies.isPending ? (
+              <Skeleton className="h-16 w-full" role="status" aria-label="Anomaliler yükleniyor" />
+            ) : anomalies.isError ? (
+              <p className="text-[13px] text-critical">Kent zekâsı verisi yüklenemedi.</p>
+            ) : anomalies.data.length === 0 ? (
+              <p className="text-[13px] text-muted">
+                Son 7 günde olağan dışı bir artış görünmüyor.
+              </p>
+            ) : (
+              <AnomalyList anomalies={anomalies.data} limit={3} />
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid items-start gap-6 xl:grid-cols-3">
         <Card className="xl:col-span-2">

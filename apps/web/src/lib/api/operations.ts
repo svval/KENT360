@@ -4,6 +4,11 @@ import {
   type MapFeatureCollection,
   type MapRequestProperties,
   type MapWorkOrderProperties,
+  type NeighborhoodPulse,
+  type NeighborhoodPulseDetail,
+  type PulseAnomaly,
+  type RequestAnalysisResult,
+  type RequestDetail,
   type SearchResultItem,
 } from '@kent360/shared-types';
 import { apiFetch } from '../api-client';
@@ -45,4 +50,48 @@ export function getMapWorkOrders(
 
 export async function globalSearch(q: string): Promise<SearchResultItem[]> {
   return (await apiFetch<ApiSuccess<SearchResultItem[]>>(`/api/v1/search${toQuery({ q })}`)).data;
+}
+
+// ─── MahallePulse (Phase 10) ─────────────────────────────────────────────────
+
+export const pulseKeys = {
+  list: ['analytics', 'neighborhoods'] as const,
+  detail: (id: string) => ['analytics', 'neighborhoods', id] as const,
+  anomalies: ['analytics', 'anomalies'] as const,
+};
+
+export async function listNeighborhoodPulse(): Promise<NeighborhoodPulse[]> {
+  return (await apiFetch<ApiSuccess<NeighborhoodPulse[]>>('/api/v1/analytics/neighborhoods')).data;
+}
+
+export async function getNeighborhoodPulse(id: string): Promise<NeighborhoodPulseDetail> {
+  return (
+    await apiFetch<ApiSuccess<NeighborhoodPulseDetail>>(`/api/v1/analytics/neighborhoods/${id}`)
+  ).data;
+}
+
+export async function listAnomalies(): Promise<PulseAnomaly[]> {
+  return (await apiFetch<ApiSuccess<PulseAnomaly[]>>('/api/v1/analytics/anomalies')).data;
+}
+
+// ─── AI (Phase 11) ───────────────────────────────────────────────────────────
+
+export async function analyzeRequest(input: {
+  description: string;
+  latitude?: number;
+  longitude?: number;
+  categoryId?: string;
+}): Promise<RequestAnalysisResult> {
+  return (
+    await apiFetch<ApiSuccess<RequestAnalysisResult>>('/api/v1/requests/analyze', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    })
+  ).data;
+}
+
+export async function joinRequest(id: string): Promise<RequestDetail> {
+  return (
+    await apiFetch<ApiSuccess<RequestDetail>>(`/api/v1/requests/${id}/join`, { method: 'POST' })
+  ).data;
 }

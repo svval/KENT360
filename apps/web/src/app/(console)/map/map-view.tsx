@@ -44,12 +44,15 @@ export function MapView() {
   const item = getNavItem('/map');
   const { hasPermission, user } = useAuth();
   const canSeeRequests = hasPermission(Permission.REQUESTS_READ);
+  const canSeeRisk = canSeeRequests && hasPermission(Permission.ANALYTICS_READ);
   const [filters, setFilters] = useUrlState(FILTER_KEYS);
   const [layers, setLayers] = useState<MapLayersState>({
     requests: true,
     critical: true,
     workOrders: true,
     neighborhoods: true,
+    heatmap: false,
+    risk: false,
   });
   const [selection, setSelection] = useState<MapSelection | null>(null);
   const [stats, setStats] = useState<MapStats | null>(null);
@@ -159,6 +162,7 @@ export function MapView() {
             className="h-[calc(100dvh-17rem)] min-h-[480px]"
             layers={layers}
             canSeeRequests={canSeeRequests}
+            canSeeRisk={canSeeRisk}
             filters={{
               status: filters.status || undefined,
               priority: filters.priority || undefined,
@@ -177,7 +181,14 @@ export function MapView() {
             onChange={setLayers}
             available={
               canSeeRequests
-                ? ['requests', 'critical', 'workOrders', 'neighborhoods']
+                ? [
+                    'requests',
+                    'critical',
+                    'workOrders',
+                    'neighborhoods',
+                    'heatmap',
+                    ...(canSeeRisk ? (['risk'] as const) : []),
+                  ]
                 : ['workOrders', 'neighborhoods']
             }
             stats={stats}

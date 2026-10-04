@@ -13,6 +13,7 @@ import {
   RequestStatusBadge,
   WorkOrderStatusBadge,
 } from '@/components/domain/status-badges';
+import { percentText, RISK_RAMP, RiskBadge } from '@/components/domain/pulse-parts';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -24,10 +25,29 @@ const LAYER_LABELS: Record<keyof MapLayersState, string> = {
   critical: 'Kritik',
   workOrders: 'İş Emirleri',
   neighborhoods: 'Mahalleler',
+  heatmap: 'Talep yoğunluğu',
+  risk: 'Mahalle riski',
 };
+
+const gradient = (stops: [number, string][]) =>
+  `linear-gradient(90deg, ${stops.map(([at, color]) => `${color} ${at}%`).join(', ')})`;
+const HEAT_STOPS: [number, string][] = [
+  [0, '#DBEAFE'],
+  [45, '#60A5FA'],
+  [70, '#2563EB'],
+  [100, '#1E3A8A'],
+];
 
 /** Legend swatch: the same shape as the marker, so identity is not colour-only. */
 function Swatch({ layer }: { layer: keyof MapLayersState }) {
+  if (layer === 'heatmap' || layer === 'risk')
+    return (
+      <span
+        aria-hidden="true"
+        className="inline-block h-2.5 w-3.5 shrink-0 rounded-[3px]"
+        style={{ background: gradient(layer === 'heatmap' ? HEAT_STOPS : RISK_RAMP) }}
+      />
+    );
   const common =
     'inline-block shrink-0 border-2 border-white shadow-[0_0_0_1px_rgba(15,23,42,0.15)]';
   if (layer === 'requests')
@@ -114,6 +134,20 @@ export function LayerControl({
       {stats?.truncated && (
         <p className="mt-2 text-xs text-warning-strong">Bu alanda çok kayıt var; yakınlaştırın.</p>
       )}
+      {layers.risk && available.includes('risk') && (
+        <div className="mt-2" aria-label="Risk skoru lejantı">
+          <span
+            className="block h-2 rounded-full"
+            style={{ background: gradient(RISK_RAMP) }}
+            aria-hidden="true"
+          />
+          <span className="mt-0.5 flex justify-between text-[11px] text-muted">
+            <span>0 düşük</span>
+            <span>50</span>
+            <span>100 kritik</span>
+          </span>
+        </div>
+      )}
       {demoNotice && available.includes('neighborhoods') && (
         <p className="mt-2 text-[11px] text-muted">Demo sınır geometrisi – resmi sınır değildir.</p>
       )}
@@ -146,6 +180,25 @@ export function SelectionCard({
         <>
           <p className="text-xs text-muted">Mahalle</p>
           <p className="text-base font-semibold">{selection.name}</p>
+          {selection.risk && (
+            <>
+              <div className="mt-2">
+                <RiskBadge level={selection.risk.riskLevel} score={selection.risk.riskScore} />
+              </div>
+              <dl className="mt-3 space-y-1">
+                <Row label="Açık talep">{selection.risk.open}</Row>
+                <Row label="SLA aşım oranı">{percentText(selection.risk.slaBreachPercent)}</Row>
+              </dl>
+              {selection.id && (
+                <Button asChild size="sm" className="mt-3 w-full">
+                  <Link href={`/neighborhoods/${selection.id}`}>
+                    MahallePulse detayı
+                    <ArrowRight aria-hidden="true" />
+                  </Link>
+                </Button>
+              )}
+            </>
+          )}
         </>
       )}
       {selection.kind === 'request' && <RequestCard p={selection.properties} />}
