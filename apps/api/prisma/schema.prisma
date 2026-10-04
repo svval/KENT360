@@ -119,6 +119,16 @@ enum WorkOrderEventType {
   MEDIA_ADDED
   COMMENT_ADDED
   LOCATION_CHECK_FAILED
+  ACCEPTED
+  EN_ROUTE
+  ON_SITE
+  STARTED
+  WAITING
+  RESUMED
+  COMPLETED
+  VERIFIED
+  RETURNED
+  CANCELLED
 }
 
 enum FieldTeamMemberRole {
@@ -630,9 +640,13 @@ model WorkOrder {
   // Sequenced per municipality and year (see Request.publicNumber).
   @@unique([municipalityId, publicNumber])
   @@index([municipalityId, status])
+  // Default list order (newest first) for the municipality and for a department.
+  @@index([municipalityId, createdAt(sort: Desc)])
+  @@index([municipalityId, departmentId, createdAt(sort: Desc)])
   @@index([status])
+  // Field staff scope ("assigned to me") and team scope / team counters.
   @@index([assignedUserId, status])
-  @@index([fieldTeamId])
+  @@index([fieldTeamId, status])
   @@index([departmentId])
   @@index([requestId])
   @@index([createdAt])
