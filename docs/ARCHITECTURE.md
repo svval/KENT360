@@ -103,7 +103,7 @@ modules/requests/
 | Doğrulama      | Global `ValidationPipe` (`whitelist`, `forbidNonWhitelisted`, `transform`)                                                                    |
 | Loglama        | `nestjs-pino` – JSON structured log, `x-request-id` korelasyonu, `authorization`/`cookie`/parola/token alanları redakte                       |
 | Güvenlik       | Helmet, CORS whitelist, global rate limit (Throttler)                                                                                         |
-| Health         | `GET /health` (liveness), `GET /health/ready` (PostgreSQL + PostGIS kontrolü, 503 ile)                                                        |
+| Health         | `GET /health` (liveness), `GET /health/ready` (PostgreSQL + PostGIS → 503; nesne depolama → `degraded`)                                       |
 | API dokümanı   | Swagger UI `/api/docs`, OpenAPI JSON `/api/docs/openapi.json`                                                                                 |
 
 ## 6. Domain İş Akışları

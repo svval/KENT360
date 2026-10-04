@@ -5,7 +5,7 @@ _Akıllı Belediye Operasyon ve Kent Zekâsı Platformu_
 
 KENT360 manages the full lifecycle of a municipal service request — from a citizen's photo and map pin, through AI-assisted triage, duplicate detection and department routing, to field-crew work orders with before/after evidence — and turns that operational data into neighbourhood-level urban intelligence.
 
-> **Status:** Phases 0–7 complete – infrastructure, authentication / RBAC / audit, the municipality domain, **request management** and **work orders & field operations** (field teams, assignment history, work order state machine, request ↔ work order sync, PostGIS on-site check, before/during/after evidence, scoped access) with their web screens. Next: Phase 8. See the [roadmap](docs/DEVELOPMENT_ROADMAP.md).
+> **Status:** Phases 0–9 complete – infrastructure, authentication / RBAC / audit, the municipality domain, **request management** and **work orders & field operations** (field teams, assignment history, work order state machine, request ↔ work order sync, PostGIS on-site check, before/during/after evidence, scoped access) with their web screens, plus the **operations dashboard** (scoped KPIs, 30-day trend, critical/recent requests), **global search** and the **MapLibre live map** (PostGIS bbox, clustering, neighbourhood layer). Next: Phase 10 (MahallePulse). See the [roadmap](docs/DEVELOPMENT_ROADMAP.md).
 
 ---
 
@@ -150,6 +150,8 @@ npm run dev:api
 - Liveness: http://localhost:4000/health → `{ "status": "ok", … }`
 - Readiness: http://localhost:4000/health/ready (PostgreSQL + PostGIS → 503 when down; object storage → `"status": "degraded"` with `checks.storage.status: "down"`)
 
+> **Map:** the base map is OpenFreeMap (free, no API key, OpenStreetMap data – needs internet). Set `NEXT_PUBLIC_MAP_STYLE_URL` in `apps/web/.env.local` to use another MapLibre style. MapLibre's web worker is copied to `apps/web/public/maplibre/` by the `predev` / `prebuild` scripts (gitignored).
+
 > **Photos broken after a reboot?** Docker Desktop occasionally comes back with a dead port proxy for a container that restarted with a new IP (requests to `localhost:9000` get an empty reply although MinIO is healthy inside the container). Readiness then reports `storage: down`; fix it with `docker compose up -d --force-recreate minio` (data lives in the volume).
 
 ## Start Web
@@ -196,23 +198,23 @@ The e2e suites run against a separate `kent360_test` database on the same Postgr
 
 ## Roadmap
 
-| Phase | Scope                                                         | Status |
-| ----- | ------------------------------------------------------------- | ------ |
-| 0     | Architecture, monorepo, documentation                         | ✅     |
-| 1     | Docker, PostGIS, Redis, MinIO, Prisma data model              | ✅     |
-| 2     | Backend foundation (config, errors, logging, Swagger, health) | ✅     |
-| 3     | Authentication, RBAC & audit                                  | ✅     |
-| 4     | Municipality domain + seed                                    | ✅     |
-| 5     | Request management, workflow, SLA                             | ✅     |
-| 6     | Work orders, teams, before/after                              | ✅     |
-| 7     | Web foundation (layout, design system, login)                 | ✅     |
-| 8     | Management UI                                                 | ⬜     |
-| 9     | GIS: map, clustering, heatmap                                 | ⬜     |
-| 10    | MahallePulse analytics                                        | ⬜     |
-| 11    | AI classification & duplicate detection                       | ⬜     |
-| 12    | Saha360 mobile                                                | ⬜     |
-| 13    | Reports, notifications, audit UI                              | ⬜     |
-| 14    | Hardening & demo polish                                       | ⬜     |
+| Phase | Scope                                                         | Status            |
+| ----- | ------------------------------------------------------------- | ----------------- |
+| 0     | Architecture, monorepo, documentation                         | ✅                |
+| 1     | Docker, PostGIS, Redis, MinIO, Prisma data model              | ✅                |
+| 2     | Backend foundation (config, errors, logging, Swagger, health) | ✅                |
+| 3     | Authentication, RBAC & audit                                  | ✅                |
+| 4     | Municipality domain + seed                                    | ✅                |
+| 5     | Request management, workflow, SLA                             | ✅                |
+| 6     | Work orders, teams, before/after                              | ✅                |
+| 7     | Web foundation (layout, design system, login)                 | ✅                |
+| 8     | Management UI                                                 | ✅                |
+| 9     | GIS: map, clustering, heatmap                                 | ✅ (heatmap → 10) |
+| 10    | MahallePulse analytics                                        | ⬜                |
+| 11    | AI classification & duplicate detection                       | ⬜                |
+| 12    | Saha360 mobile                                                | ⬜                |
+| 13    | Reports, notifications, audit UI                              | ⬜                |
+| 14    | Hardening & demo polish                                       | ⬜                |
 
 ## Screenshots
 

@@ -187,3 +187,11 @@ Phase 4 ekranları (`/settings/*`) ortak kalıpları kullanır:
 - **İşi Tamamla:** açıklama + "sonra" fotoğrafı seçimi (önizleme, kaldırma); buton ancak ikisi de sağlanınca aktif; başarıda toast "İş emri tamamlandı."
 - **Talep detayı:** `canCreateWorkOrder` ise "İş Emri Oluştur" (talimat alanı; vatandaşa gösterilmez); bağlı iş emirleri kartı (numara + durum rozeti).
 - **Saha ekipleri (`/field/teams`):** ekip, müdürlük, sorumlu, üye / açık iş / tamamlanan sayıları, durum; oluştur/düzenle diyaloğu (kod ve müdürlük sonradan salt okunur), üyeler diyaloğu (müdürlüğün saha personelinden ekleme, sorumlu seçimi, çıkarma).
+
+## 17. Operasyon Paneli ve Canlı Harita (Phase 8–9)
+
+- **Dashboard:** üstte 6 KPI kartı (etiket → büyük `tabular-nums` değer → kısa açıklama → varsa karşılaştırma; iyileşme yeşil, kötüleşme kırmızı, nötr gri). Ardından geniş canlı harita kartı ("Haritayı aç"), trend (2/3) + kritik talepler (1/3), son talepler tablosu. Veri dakikada bir yenilenir. `requests.read` olmayan kullanıcıya (vatandaş, saha personeli) operasyon verisi yerine kısayol paneli gösterilir.
+- **Trend grafiği:** "Oluşturulan" (#2563EB, düz) ve "Çözülen" (#0891B2, kesikli) – palet dataviz doğrulayıcısından geçti; kimlik yalnız renge dayanmaz (çizgi deseni, lejant, uçta direkt etiket). Tek eksen, silik ızgara, çarpı imleç + tooltip, "Tablo görünümü".
+- **Harita marker'ları:** talep = mavi daire, kritik (CRITICAL veya SLA aşıldı) = kırmızı eşkenar dörtgen + "!", iş emri = amber kare (talebinin yanına kaydırılmış), çözülmüş = küçük gri daire; kümeler lacivert daire + sayı. Lejant katman panelindedir ve marker'ın şeklini taşır.
+- **Harita yerleşimi:** `/map` sayfası tam genişlik; üstte filtre çubuğu (durum, öncelik, müdürlük, kategori, tarih – URL'de), sağ üstte katman paneli (sayılarla), sol altta seçim kartı, sağ altta zoom. Altlık yüklenemezse veya yapılandırılmamışsa açıklayıcı boş durum.
+- **Genel arama:** topbar'da; 250 ms debounce, en az 2 karakter; sonuçlar ikon + "Talep"/"İş Emri" etiketiyle; ↑/↓, Enter, Esc.

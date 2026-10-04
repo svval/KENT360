@@ -288,3 +288,12 @@ Geçiş tablosunun tamamı `request-status.machine.ts`'te tanımlıdır; her ge�
 ### Demo veri
 
 `prisma/seed-work-orders.ts`: 5 ekip (Fen İşleri – Ekip 1/2, Park ve Bahçeler – Merkez Ekip, Temizlik – Ekip 1, Zabıta – Merkez Ekip), 6 ek demo saha personeli, **45 iş emri** (`WO-2026-000001…000045`): 28 doğrulanmış (daha önce kapanmış taleplerde) + 17 açık (CREATED 2, ASSIGNED 3, ACCEPTED 2, EN_ROUTE 1, ON_SITE 2, IN_PROGRESS 3, WAITING 2, COMPLETED 2). Bağlı talepler API'nin yapacağı gibi ilerletilir. Önce/sonra fotoğrafları programatik çizilir (indirilmiş görsel yok) ve `normalizeImage`'dan geçer. Deterministik ve idempotent (`demoSeed: phase6-v1`); e2e `seed.e2e-spec.ts` iki kez çalıştırıp hiçbir şey eklenmediğini doğrular.
+
+## 12. Operasyon Okuma Modelleri (Phase 8–9)
+
+Dashboard, harita ve arama yeni tablo veya index eklemez; mevcut verinin kapsamlı sorgularıdır (`src/modules/operations`).
+
+- **Kapsam SQL'e çevrilir:** Raw / PostGIS sorguları da liste uçlarının nesne kapsamını kullanır. `scopeToSql()` yalnızca kapsam fonksiyonlarının ürettiği şekilleri (`{}`, `{ kolon: uuid }`, `{ kolon: { in: [...] } }`, `{ OR: [...] }`) izinli kolon listesiyle SQL'e çevirir; değerler parametredir, tanımadığı bir anahtar görürse hata verir (fail closed). `municipality_id` her sorguda elle filtrelenir.
+- **KPI:** talepler için tek toplama sorgusu (`count(*) FILTER (…)`, `avg(resolved_at - created_at)`); açık iş emri sayısı Prisma `count`. Trend: oluşturma ve çözülme için birer `GROUP BY (… AT TIME ZONE <belediye saat dilimi>)::date`. Kritik liste: üç küçük sınırlı sorgu (CRITICAL / SLA aşıldı / SLA riskte), birleştirilip tekilleştirilir. N+1 yok.
+- **Harita:** `location && ST_MakeEnvelope(batı, güney, doğu, kuzey, 4326)` – GIST `location` index'i. `EXPLAIN ANALYZE` (demo veri): talep bbox + müdürlük sorgusu `requests_location_idx` ve `requests_department_id_idx` ile Bitmap Index Scan, ~2 ms. KPI toplaması 120 satırda sıralı tarama (0,25 ms); büyüyen veride `(municipality_id, created_at DESC)` index'i kullanılabilir. **Yeni index gerekmedi.**
+- **Arama:** talep ve iş emri liste sorgularının kendisi (trigram index'li `ILIKE`, tam numara eşleşmesi) – ayrı bir arama yapısı yok.

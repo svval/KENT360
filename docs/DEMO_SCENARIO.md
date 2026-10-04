@@ -95,3 +95,12 @@ Sahne 2'nin fotoğraf + konum + açıklama ile talep oluşturma bölümü (AI ö
 Demo bilgisayarı belediye sınırında değilse konum adımı reddedilir – bu beklenen davranıştır. Sunumda tarayıcının konum simülasyonu (DevTools → Sensors) veya yalnız geliştirme ortamında `.env`'de `FIELD_LOCATION_BYPASS=true` kullanılabilir (geçmişe "Konum kontrolü geliştirme modunda atlandı" yazılır). Mobil Saha360 Phase 12'de aynı API ile gelir.
 
 Harita üzerinden nokta seçimi Phase 9'da, AI önerisi ve mükerrer uyarısı Phase 11'de eklenecek.
+
+## Phase 8–9 ile çalışan kısım (Sahne 1 ve 5)
+
+1. `admin@kent360.local` → **Dashboard**: 6 KPI, canlı harita (açık talepler, kritikler, aktif iş emirleri), 30 günlük trend, kritik talepler, son talepler.
+2. **Canlı Harita**: uzaklaşınca kümeler, yakınlaşınca tekil marker'lar; katman panelinden Talepler / Kritik / İş Emirleri / Mahalleler aç-kapat; bir kritik marker → kart → **Detaya git**; bir iş emri karesi → **İş emrine git**; filtre çubuğu (ör. öncelik = Kritik) adres çubuğunda kalır.
+3. Topbar'da `WO-2026-000046` veya `KNT-…` ara → Enter.
+4. `manager@kent360.local` aynı ekranlarda yalnız Fen İşleri'ni, `field@kent360.local` haritada yalnız kendi ekibinin iş emirlerini görür; vatandaş dashboard'da kısayol panelini görür.
+
+Not: demo talepleri seed anına göre son 90 güne yayılır; seed'den günler sonra açık taleplerin çoğu SLA'yı aşmış görünür ve kritik katmanında yer alır. Taze bir görünüm için demo veritabanını yeniden seed'leyin. Altlık için internet bağlantısı gerekir (OpenFreeMap).

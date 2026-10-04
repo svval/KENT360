@@ -104,13 +104,22 @@ Durum: ✅ tamamlandı · 🟡 kısmen · ⬜ planlandı
 - ✅ Gerçek oturum yönetimi, route koruması, izin bazlı menü (Phase 3)
 - ✅ Toast sistemi (Phase 4)
 
-## Phase 8 – Yönetim Arayüzü
+## Phase 8 – Yönetim Arayüzü ✅
 
-- Dashboard KPI'ları ve grafikler (Recharts), talep listesi (URL state, filtre, sıralama, sayfalama), talep detayı (timeline, AI paneli, harita), iş emri listesi/detayı (önce/sonra karşılaştırma), vatandaş "Yeni Talep" akışı
+- ✅ `GET /dashboard/overview`: 6 KPI (bugün/dün, açık, kritik, açık iş emri, ort. çözüm süresi ve SLA uyumu – önceki 30 günle), 30 günlük yerel trend, kritik talepler (CRITICAL → SLA aşıldı → SLA riskte), son talepler; kullanıcının kapsamında
+- ✅ Dashboard ekranı: KPI kartları, bağımlılıksız SVG trend grafiği (doğrulanmış palet, lejant + direkt etiket + tooltip + tablo görünümü), kritik ve son talepler, küçük canlı harita; vatandaş ve saha personeline kısayol paneli
+- ✅ Topbar genel arama (`GET /search`): talep ve iş emri, numara / açıklama / adres, kapsam korunur; klavye ile gezinme
+- ✅ (Talep / iş emri listeleri ve detayları Phase 5–6'da tamamlandı)
+- ⏭ AI paneli → Phase 11; vatandaş kaydı ve mobil talep akışı → Phase 12
 
-## Phase 9 – GIS
+## Phase 9 – GIS ✅
 
-- MapLibre GL, OSM tabanlı raster/vektör altlık, GeoJSON kaynakları, supercluster kümeleme, heatmap katmanı, mahalle choropleth, katman paneli, bbox bazlı veri yükleme
+- ✅ MapLibre GL 6 + ücretsiz, anahtarsız OpenFreeMap altlığı (`NEXT_PUBLIC_MAP_STYLE_URL` ile değiştirilebilir; yoksa yapılandırma uyarısı)
+- ✅ `GET /map/requests`, `GET /map/work-orders`: zarfsız GeoJSON, PostGIS bbox (GIST), filtreler, kapsam
+- ✅ `/map`: talep (kümeli), kritik, iş emri ve mahalle katmanları; katman paneli/lejant; renk + şekil farkı; seçim kartı ("Detaya git" / "İş emrine git"); URL'de filtreler; görünür alan değişince debounce'lu yeniden yükleme
+- ✅ Kümeleme MapLibre'nin dahili GeoJSON kümelemesiyle (ayrı supercluster bağımlılığı gerekmedi)
+- ✅ Mahalle sınırları Phase 4 GeoJSON ucundan: ince çizgi, düşük opaklık, hover, tıklayınca ad; geliştirmede "Demo sınır geometrisi" notu
+- ⏭ Isı haritası ve mahalle choropleth'i → Phase 10 (MahallePulse metrikleriyle birlikte)
 
 ## Phase 10 – MahallePulse
 

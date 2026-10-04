@@ -80,10 +80,10 @@ Durum: ✅ uygulandı · 🗓 planlandı (faz)
 
 ### System
 
-| Metot | Yol             | Açıklama                            | Durum |
-| ----- | --------------- | ----------------------------------- | ----- |
-| GET   | `/health`       | Liveness                            | ✅    |
-| GET   | `/health/ready` | PostgreSQL + PostGIS kontrolü (503) | ✅    |
+| Metot | Yol             | Açıklama                                                                                                           | Durum |
+| ----- | --------------- | ------------------------------------------------------------------------------------------------------------------ | ----- |
+| GET   | `/health`       | Liveness                                                                                                           | ✅    |
+| GET   | `/health/ready` | PostgreSQL + PostGIS (yoksa 503) ve nesne depolama (yoksa `"status": "degraded"`, `checks.storage.status: "down"`) | ✅    |
 
 ### Auth (Phase 3) ✅
 
@@ -183,7 +183,21 @@ Detay yanıtı: kaynak talep (no, durum, açıklama, fotoğraflar – bildiren k
 
 Hata kodları: `WORK_ORDER_NOT_FOUND` (404), `WORK_ORDER_ALREADY_EXISTS` (409 – talebin aktif iş emri var), `REQUEST_NOT_READY_FOR_WORK_ORDER` (409), `REQUEST_HAS_ACTIVE_WORK_ORDER` (409 – aktif iş emri varken talep yeniden yönlendirilemez), `INVALID_STATUS_TRANSITION` (409, `details: { from, to, allowed }`), `WORK_ORDER_STALE` (409 – eşzamanlı değişiklik veya `from` uyuşmazlığı), `WORK_ORDER_NOT_ASSIGNABLE` (409), `NOT_WORK_ORDER_EXECUTOR` (403), `TRANSITION_REASON_REQUIRED` (400), `COMPLETION_DESCRIPTION_REQUIRED` (400), `AFTER_PHOTO_REQUIRED` (409), `FIELD_LOCATION_REQUIRED` (400), `FIELD_LOCATION_TOO_FAR` (409, `details: { distanceMeters, radiusMeters }`), `MEDIA_TYPE_NOT_ALLOWED` (409), `MEDIA_LIMIT_REACHED` (409, tür başına 5), `ASSIGNEE_INVALID` (409), `FIELD_TEAM_NOT_FOUND` (404), `FIELD_TEAM_INACTIVE` (409), `FIELD_TEAM_CODE_TAKEN` (409), `FIELD_TEAM_MEMBER_INVALID` (400), `FIELD_TEAM_HAS_ACTIVE_WORK` (409); medya hataları talep fotoğraflarıyla aynıdır.
 
-### Analytics / Reports / Notifications / Audit (Phase 8–13)
+### Dashboard, Map, Search (Phase 8–9) ✅
+
+| Metot | Yol                   | İzin                                                                                                                                                                                                                                    |
+| ----- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET   | `/dashboard/overview` | `requests.read` – KPI'lar, 30 günlük trend, kritik ve son talepler (vatandaş ve saha personeli → 403)                                                                                                                                   |
+| GET   | `/map/requests`       | `requests.read` – **zarfsız** GeoJSON `FeatureCollection` (Point); `bbox=batı,güney,doğu,kuzey`, `status`, `priority` (çoklu), `departmentId`, `categoryId` (ana kategori alt kategorileriyle), `createdFrom`, `createdTo`, `open=true` |
+| GET   | `/map/work-orders`    | `workOrders.read` **veya** `workOrders.readAssigned` – zarfsız GeoJSON; `bbox`, `status`, `priority`, `departmentId`, `open=true`                                                                                                       |
+| GET   | `/search?q=`          | talep veya iş emri okuma izni – en az 2 karakter; tür başına 5 sonuç: `[{ type: REQUEST\|WORK_ORDER, id, publicNumber, title, subtitle, status }]`                                                                                      |
+
+- **Kapsam:** hepsi liste uçlarıyla aynı nesne kapsamını kullanır (§9, §10): yönetici belediyenin tümü, müdürlük yöneticisi kendi müdürlüğü, saha personeli iş emri haritasında yalnız kendi/ekibinin işleri. Filtreler kapsamı genişletemez; başka belediye hiç görünmez.
+- **Dashboard KPI'ları** (belediyenin saat dilimine göre): `todayRequests` (yerel gece yarısından beri; `previous`: dün), `openRequests` (RESOLVED / VERIFIED / CLOSED / REJECTED dışı), `criticalRequests` (açık + CRITICAL), `openWorkOrders` (CREATED … WAITING), `avgResolutionMinutes` ve `slaCompliancePercent` (son 30 günde çözülenler; `previous`: önceki 30 gün). `trend`: son 30 yerel gün, `{ date, created, resolved }`. `criticalRequests`: açık talepler – önce CRITICAL, sonra SLA aşılmış, sonra SLA riskte (`reason` ile), en fazla 8.
+- **Harita özellikleri yalındır:** talep → `id, publicNumber, status, priority, category, department, neighborhood, slaStatus, critical, done, createdAt`; iş emri → `id, publicNumber, status, priority, department, team, assignedUser, requestId, requestNumber`. Açıklama, adres, bildiren gibi alanlar taşınmaz. En fazla 5000 nesne (en yeniler); fazlası varsa `"truncated": true` (yabancı üye).
+- Geçersiz `bbox` → `400`.
+
+### Analytics / Reports / Notifications / Audit (Phase 10–13)
 
 | Metot | Yol                                                                                 | İzin                            |
 | ----- | ----------------------------------------------------------------------------------- | ------------------------------- |
