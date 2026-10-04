@@ -1,6 +1,7 @@
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadBucketCommand,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
@@ -87,6 +88,16 @@ export class StorageService implements OnModuleDestroy {
       { expiresIn: this.urlTtlSeconds },
     );
     return { url, expiresAt: new Date(Date.now() + this.urlTtlSeconds * 1000) };
+  }
+
+  /**
+   * Readiness probe: the bucket answers within 3 s. Uses the same endpoint the API
+   * uploads to (a broken Docker port proxy shows up here as well).
+   */
+  async ping(): Promise<void> {
+    await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }), {
+      abortSignal: AbortSignal.timeout(3000),
+    });
   }
 
   onModuleDestroy(): void {

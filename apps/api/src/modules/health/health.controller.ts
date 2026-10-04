@@ -28,12 +28,14 @@ export class HealthController {
   }
 
   @Get('ready')
-  @ApiOperation({ summary: 'Readiness probe – dependencies (PostgreSQL + PostGIS) are reachable' })
-  @ApiOkResponse({ description: 'All dependencies are up' })
-  @ApiServiceUnavailableResponse({ description: 'At least one dependency is down' })
+  @ApiOperation({
+    summary: 'Readiness probe – PostgreSQL + PostGIS and object storage are reachable',
+  })
+  @ApiOkResponse({ description: 'ok, or degraded when only object storage is down' })
+  @ApiServiceUnavailableResponse({ description: 'The database is down' })
   async readiness(@Res({ passthrough: true }) res: Response): Promise<HealthStatus> {
     const result = await this.health.readiness();
-    if (result.status !== 'ok') res.status(HttpStatus.SERVICE_UNAVAILABLE);
+    if (result.status === 'error') res.status(HttpStatus.SERVICE_UNAVAILABLE);
     return result;
   }
 }

@@ -34,6 +34,7 @@ import { ApiRequestError } from '@/lib/api-client';
 import { getNeighborhoodGeoJson, queryKeys } from '@/lib/api/municipality-domain';
 import { getRequest, requestKeys, uploadRequestPhoto } from '@/lib/api/requests';
 import { cn, formatDateTime } from '@/lib/utils';
+import { PrivateImage } from '@/components/domain/private-image';
 import { useToast } from '@/providers/toast-provider';
 import { type RequestAction, RequestActionDialog } from './request-actions';
 
@@ -376,9 +377,7 @@ function PhotosCard({ request }: { request: RequestDetail }) {
                   rel="noopener noreferrer"
                   className="block overflow-hidden rounded-lg border border-border focus-visible:outline-2 focus-visible:outline-primary"
                 >
-                  {/* Private object via a short-lived presigned URL; not next/image (no fixed host). */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
+                  <PrivateImage
                     src={m.url}
                     alt={`Talep fotoğrafı ${i + 1}`}
                     className="aspect-square w-full object-cover"

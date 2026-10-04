@@ -148,7 +148,9 @@ npm run dev:api
 
 - API: http://localhost:4000/api/v1
 - Liveness: http://localhost:4000/health → `{ "status": "ok", … }`
-- Readiness: http://localhost:4000/health/ready (checks PostgreSQL + PostGIS, 503 when down)
+- Readiness: http://localhost:4000/health/ready (PostgreSQL + PostGIS → 503 when down; object storage → `"status": "degraded"` with `checks.storage.status: "down"`)
+
+> **Photos broken after a reboot?** Docker Desktop occasionally comes back with a dead port proxy for a container that restarted with a new IP (requests to `localhost:9000` get an empty reply although MinIO is healthy inside the container). Readiness then reports `storage: down`; fix it with `docker compose up -d --force-recreate minio` (data lives in the volume).
 
 ## Start Web
 

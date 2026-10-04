@@ -34,6 +34,7 @@ import { ApiRequestError } from '@/lib/api-client';
 import { getNeighborhoodGeoJson, queryKeys } from '@/lib/api/municipality-domain';
 import { getWorkOrder, uploadWorkOrderPhoto, workOrderKeys } from '@/lib/api/work-orders';
 import { cn, formatDateTime } from '@/lib/utils';
+import { PrivateImage } from '@/components/domain/private-image';
 import { useAuth } from '@/providers/auth-provider';
 import { useToast } from '@/providers/toast-provider';
 import { type WorkOrderAction, WorkOrderActionDialog } from './work-order-actions';
@@ -389,8 +390,11 @@ export function WorkOrderDetailView({ id }: { id: string }) {
             </Button>
           }
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={zoom.url} alt={zoom.label} className="mx-auto max-h-[70dvh] rounded-lg" />
+          <PrivateImage
+            src={zoom.url}
+            alt={zoom.label}
+            className="mx-auto max-h-[70dvh] rounded-lg"
+          />
         </Dialog>
       )}
     </div>
@@ -446,9 +450,11 @@ function BeforeAfterCard({
             className="group relative block w-full overflow-hidden rounded-lg border border-border focus-visible:outline-2 focus-visible:outline-primary"
             aria-label={`${main.label} – büyüt`}
           >
-            {/* Private object via a short-lived presigned URL; not next/image (no fixed host). */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={main.url} alt={main.label} className="aspect-[4/3] w-full object-cover" />
+            <PrivateImage
+              src={main.url}
+              alt={main.label}
+              className="aspect-[4/3] w-full object-cover"
+            />
             <span className="absolute right-2 bottom-2 rounded-md bg-navy/70 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
               <ZoomIn className="size-4" aria-hidden="true" />
             </span>
@@ -505,8 +511,7 @@ function PhotoStrip({
             className="block w-full overflow-hidden rounded-lg border border-border focus-visible:outline-2 focus-visible:outline-primary"
             aria-label={`${photo.label} – büyüt`}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <PrivateImage
               src={photo.url}
               alt={photo.label}
               className="aspect-square w-full object-cover"
