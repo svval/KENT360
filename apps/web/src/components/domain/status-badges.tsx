@@ -4,6 +4,8 @@ import {
   type RecordStatus,
   REQUEST_STATUS_LABELS,
   type RequestStatus,
+  WORK_ORDER_STATUS_LABELS,
+  type WorkOrderStatus,
 } from '@kent360/shared-types';
 import { Badge } from '@/components/ui/badge';
 
@@ -49,4 +51,25 @@ const REQUEST_STATUS_TONE: Record<
 
 export function RequestStatusBadge({ status }: { status: RequestStatus }) {
   return <Badge tone={REQUEST_STATUS_TONE[status]}>{REQUEST_STATUS_LABELS[status]}</Badge>;
+}
+
+/** Work order status tones: field steps in progress are "warning", done is "success". */
+const WORK_ORDER_STATUS_TONE: Record<
+  WorkOrderStatus,
+  'neutral' | 'info' | 'accent' | 'warning' | 'success' | 'critical'
+> = {
+  CREATED: 'neutral',
+  ASSIGNED: 'info',
+  ACCEPTED: 'info',
+  EN_ROUTE: 'accent',
+  ON_SITE: 'accent',
+  IN_PROGRESS: 'warning',
+  WAITING: 'warning',
+  COMPLETED: 'success',
+  VERIFIED: 'success',
+  CANCELLED: 'critical',
+};
+
+export function WorkOrderStatusBadge({ status }: { status: WorkOrderStatus }) {
+  return <Badge tone={WORK_ORDER_STATUS_TONE[status]}>{WORK_ORDER_STATUS_LABELS[status]}</Badge>;
 }

@@ -21,7 +21,11 @@ import { GeometryPreview } from '@/components/domain/geometry-preview';
 import { errorMessage, QueryError } from '@/components/domain/query-states';
 import { RequestTimeline } from '@/components/domain/request-timeline';
 import { SlaIndicator } from '@/components/domain/sla-indicator';
-import { PriorityBadge, RequestStatusBadge } from '@/components/domain/status-badges';
+import {
+  PriorityBadge,
+  RequestStatusBadge,
+  WorkOrderStatusBadge,
+} from '@/components/domain/status-badges';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -85,7 +89,8 @@ export function RequestDetailView({ id }: { id: string }) {
   const staffActions =
     r.actions.transitions.length > 0 ||
     r.actions.canChangePriority ||
-    r.actions.canChangeDepartment;
+    r.actions.canChangeDepartment ||
+    r.actions.canCreateWorkOrder;
 
   return (
     <div className="space-y-6">
@@ -230,12 +235,38 @@ export function RequestDetailView({ id }: { id: string }) {
             </CardContent>
           </Card>
 
+          {r.workOrders.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>İş emirleri</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2 text-[13.5px]">
+                  {r.workOrders.map((wo) => (
+                    <li key={wo.id} className="flex items-center justify-between gap-2">
+                      <Link
+                        href={`/work-orders/${wo.id}`}
+                        className="font-mono text-primary hover:underline"
+                      >
+                        {wo.publicNumber}
+                      </Link>
+                      <WorkOrderStatusBadge status={wo.status} />
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
+
           {staffActions && (
             <Card>
               <CardHeader>
                 <CardTitle>İşlemler</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col gap-2">
+                {r.actions.canCreateWorkOrder && (
+                  <Button onClick={() => setAction({ kind: 'workOrder' })}>İş Emri Oluştur</Button>
+                )}
                 {r.actions.transitions.map((option) => (
                   <Button
                     key={option.to}

@@ -1,14 +1,14 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-import { WorkOrdersView } from './work-orders-view';
+import { TeamsView } from './teams-view';
 
-export const metadata: Metadata = { title: 'İş Emirleri' };
+export const metadata: Metadata = { title: 'Saha Ekipleri' };
 
-export default function WorkOrdersPage() {
+export default function FieldTeamsPage() {
   // Filters live in the URL (useSearchParams) – needs a Suspense boundary.
   return (
     <Suspense>
-      <WorkOrdersView />
+      <TeamsView />
     </Suspense>
   );
 }

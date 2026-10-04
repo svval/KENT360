@@ -1,5 +1,4 @@
 import {
-  type ApiError,
   type ApiSuccess,
   type Priority,
   type RequestDetail,
@@ -7,9 +6,8 @@ import {
   type RequestStatus,
   type RequestSummary,
 } from '@kent360/shared-types';
-import { ApiRequestError, apiFetch } from '../api-client';
-import { appConfig } from '../config';
-import { getAccessToken, refreshSession } from '../session';
+import { apiFetch } from '../api-client';
+import { uploadFile } from './upload';
 
 export const requestKeys = {
   all: ['requests'] as const,
@@ -91,57 +89,16 @@ export async function changeRequestDepartment(
   ).data;
 }
 
-/**
- * Uploads one photo with progress reporting (fetch cannot report upload progress).
- * Renews an expired access token once, like apiFetch.
- */
+/** Uploads one photo with progress reporting (shared multipart helper). */
 export function uploadRequestPhoto(
   requestId: string,
   file: File,
   onProgress: (percent: number) => void,
-  retried = false,
 ): Promise<RequestMediaItem[]> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', `${appConfig.apiUrl}/api/v1/requests/${requestId}/media`);
-    const token = getAccessToken();
-    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-    xhr.setRequestHeader('Accept', 'application/json');
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100));
-    };
-    xhr.onerror = () => reject(new ApiRequestError(0, 'NETWORK_ERROR', 'Sunucuya ulaşılamıyor.'));
-    xhr.onload = () => {
-      let body: unknown = null;
-      try {
-        body = JSON.parse(xhr.responseText);
-      } catch {
-        // non-JSON error page
-      }
-      if (xhr.status >= 200 && xhr.status < 300) {
-        resolve((body as ApiSuccess<RequestMediaItem[]>).data);
-        return;
-      }
-      if (xhr.status === 401 && token && !retried) {
-        void refreshSession().then((session) =>
-          session
-            ? uploadRequestPhoto(requestId, file, onProgress, true).then(resolve, reject)
-            : reject(new ApiRequestError(401, 'UNAUTHORIZED', 'Oturumunuzun süresi doldu.')),
-        );
-        return;
-      }
-      const error = body as ApiError | null;
-      reject(
-        new ApiRequestError(
-          xhr.status,
-          error?.code ?? 'HTTP_ERROR',
-          error?.message ?? 'Fotoğraf yüklenemedi.',
-          error?.details ?? null,
-        ),
-      );
-    };
-    const form = new FormData();
-    form.append('files', file);
-    xhr.send(form);
-  });
+  return uploadFile<RequestMediaItem[]>(
+    `/api/v1/requests/${requestId}/media`,
+    file,
+    {},
+    onProgress,
+  );
 }

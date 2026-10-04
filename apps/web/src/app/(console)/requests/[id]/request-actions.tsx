@@ -8,6 +8,7 @@ import {
 } from '@kent360/shared-types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LoaderCircle } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { errorMessage } from '@/components/domain/query-states';
 import { Button } from '@/components/ui/button';
@@ -20,12 +21,14 @@ import {
   requestKeys,
   transitionRequest,
 } from '@/lib/api/requests';
+import { createWorkOrder } from '@/lib/api/work-orders';
 import { useToast } from '@/providers/toast-provider';
 
 export type RequestAction =
   | { kind: 'transition'; option: RequestTransitionOption }
   | { kind: 'priority' }
-  | { kind: 'department' };
+  | { kind: 'department' }
+  | { kind: 'workOrder' };
 
 /**
  * One dialog for the staff actions on a request. The server decides what is allowed
@@ -42,6 +45,7 @@ export function RequestActionDialog({
 }) {
   const toast = useToast();
   const queryClient = useQueryClient();
+  const router = useRouter();
   const [reason, setReason] = useState('');
   const [priority, setPriority] = useState<Priority>(request.priority);
   const [departmentId, setDepartmentId] = useState(request.department?.id ?? '');
@@ -54,6 +58,18 @@ export function RequestActionDialog({
   });
 
   const reasonRequired = action.kind === 'transition' && action.option.requiresReason;
+
+  const workOrder = useMutation({
+    mutationFn: () =>
+      createWorkOrder({ requestId: request.id, instructions: reason.trim() || undefined }),
+    onSuccess: (created) => {
+      void queryClient.invalidateQueries({ queryKey: ['requests'] });
+      void queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+      toast.success(`${created.publicNumber} iş emri oluşturuldu.`);
+      router.push(`/work-orders/${created.id}`);
+    },
+    onError: (err) => setError(errorMessage(err, 'İş emri oluşturulamadı.')),
+  });
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -70,6 +86,7 @@ export function RequestActionDialog({
         transition: `${updated.publicNumber}: ${action.kind === 'transition' ? action.option.label.toLocaleLowerCase('tr-TR') : ''} işlemi tamamlandı.`,
         priority: `${updated.publicNumber} önceliği "${PRIORITY_LABELS[updated.priority]}" olarak güncellendi.`,
         department: `${updated.publicNumber}, ${updated.department?.name ?? 'yeni müdürlüğe'} yönlendirildi.`,
+        workOrder: '',
       };
       toast.success(messages[action.kind]);
       onClose();
@@ -82,11 +99,14 @@ export function RequestActionDialog({
       ? action.option.label
       : action.kind === 'priority'
         ? 'Önceliği değiştir'
-        : 'Başka müdürlüğe yönlendir';
+        : action.kind === 'workOrder'
+          ? 'İş Emri Oluştur'
+          : 'Başka müdürlüğe yönlendir';
   const unchanged =
     (action.kind === 'priority' && priority === request.priority) ||
     (action.kind === 'department' && (!departmentId || departmentId === request.department?.id));
-  const blocked = mutation.isPending || unchanged || (reasonRequired && reason.trim() === '');
+  const pending = mutation.isPending || workOrder.isPending;
+  const blocked = pending || unchanged || (reasonRequired && reason.trim() === '');
 
   return (
     <Dialog
@@ -96,7 +116,9 @@ export function RequestActionDialog({
       description={
         action.kind === 'department'
           ? 'SLA süresi değişmez; talep oluşturulduğu anda başlayan süre geçerlidir.'
-          : undefined
+          : action.kind === 'workOrder'
+            ? `${request.department?.name ?? 'Müdürlük'} için saha iş emri açılır; konum, öncelik ve SLA talepten alınır.`
+            : undefined
       }
       footer={
         <>
@@ -110,10 +132,11 @@ export function RequestActionDialog({
             disabled={blocked}
             onClick={() => {
               setError(null);
-              mutation.mutate();
+              if (action.kind === 'workOrder') workOrder.mutate();
+              else mutation.mutate();
             }}
           >
-            {mutation.isPending && <LoaderCircle className="animate-spin" aria-hidden="true" />}
+            {pending && <LoaderCircle className="animate-spin" aria-hidden="true" />}
             {title}
           </Button>
         </>
@@ -144,8 +167,18 @@ export function RequestActionDialog({
           </Field>
         )}
         <Field
-          label={reasonRequired ? 'Gerekçe' : 'Gerekçe (isteğe bağlı)'}
-          hint="Süreç kaydında görünür; vatandaş da görebilir."
+          label={
+            action.kind === 'workOrder'
+              ? 'Saha ekibi için talimat (isteğe bağlı)'
+              : reasonRequired
+                ? 'Gerekçe'
+                : 'Gerekçe (isteğe bağlı)'
+          }
+          hint={
+            action.kind === 'workOrder'
+              ? 'Yalnızca iş emrinde görünür; vatandaşa gösterilmez.'
+              : 'Süreç kaydında görünür; vatandaş da görebilir.'
+          }
           required={reasonRequired}
         >
           <Textarea maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} />

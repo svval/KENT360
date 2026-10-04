@@ -69,12 +69,13 @@ export const navigation: NavSection[] = [
         label: 'İş Emirleri',
         description: 'Sahaya çıkan işleri planlayın, atayın ve kapanışlarını doğrulayın.',
         icon: ClipboardList,
-        permission: Permission.WORK_ORDERS_READ,
+        // Field staff and team leaders see their own work here ("Görevlerim").
+        permission: [Permission.WORK_ORDERS_READ, Permission.WORK_ORDERS_READ_ASSIGNED],
       },
       {
-        href: '/field',
-        label: 'Saha Operasyonları',
-        description: 'Saha ekiplerini, personeli ve günlük iş yükünü takip edin.',
+        href: '/field/teams',
+        label: 'Saha Ekipleri',
+        description: 'Müdürlüklerin saha ekipleri, sorumluları, üyeleri ve iş yükü.',
         icon: Truck,
         permission: Permission.FIELD_TEAMS_READ,
       },
