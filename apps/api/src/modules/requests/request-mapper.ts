@@ -46,9 +46,38 @@ export const requestDetailSelect = {
     select: { id: true, storageKey: true, mimeType: true, sizeBytes: true, createdAt: true },
     orderBy: { createdAt: 'asc' },
   },
+  supporterCount: true,
   workOrders: {
     select: { id: true, publicNumber: true, status: true },
     orderBy: { createdAt: 'asc' },
+  },
+  aiAnalyses: {
+    select: {
+      id: true,
+      provider: true,
+      model: true,
+      prioritySuggestion: true,
+      confidence: true,
+      summary: true,
+      rawResponse: true,
+      accepted: true,
+      latencyMs: true,
+      createdAt: true,
+      suggestedCategory: { select: { id: true, name: true } },
+      suggestedDepartment: { select: { id: true, name: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 1,
+  },
+  duplicateMatches: {
+    select: {
+      score: true,
+      distanceMeters: true,
+      status: true,
+      matchedRequest: { select: { id: true, publicNumber: true } },
+    },
+    orderBy: { score: 'desc' },
+    take: 5,
   },
   history: {
     select: {

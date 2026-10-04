@@ -5,7 +5,8 @@
  * the demo accounts (password: Kent360!Demo), departments, the request category tree and
  * DEMO neighbourhood geometries (not official boundaries – see prisma/seed-domain.ts).
  * 120 deterministic DEMO requests (Phase 5, created once), 5 field teams with demo field
- * staff and 45 DEMO work orders with drawn before/after photos (Phase 6, created once).
+ * staff and 45 DEMO work orders with drawn before/after photos (Phase 6, created once),
+ * 9 recent MahallePulse / AI demo requests with stored analyses (Phase 10–11, once).
  *
  * Never run against a production database: it refuses NODE_ENV=production.
  */
@@ -18,6 +19,7 @@ import { hashPassword } from '../src/modules/auth/domain/password-policy';
 import { seedDemoMunicipality, seedDemoUsers, seedRbac } from './seed-data';
 import { seedMunicipalityDomain } from './seed-domain';
 import { seedDemoRequests } from './seed-requests';
+import { seedPulseSignals } from './seed-pulse';
 import { type PutObject, seedDemoWorkOrders } from './seed-work-orders';
 
 loadEnv({ path: path.resolve(__dirname, '../../../.env'), quiet: true });
@@ -74,6 +76,7 @@ async function main(): Promise<void> {
   const domain = await seedMunicipalityDomain(prisma, municipalityId);
   const requests = await seedDemoRequests(prisma, municipalityId);
   const field = await seedDemoWorkOrders(prisma, municipalityId, hashPassword, objectStorage());
+  const signals = await seedPulseSignals(prisma, municipalityId);
 
   const [permissions, roles, mappings, municipalities, users] = await Promise.all([
     prisma.permission.count(),
@@ -88,7 +91,8 @@ async function main(): Promise<void> {
       `${municipalities} municipality, ${users} users (${newUsers} new); new domain records: ` +
       `${domain.departments} departments, ${domain.categories} categories, ` +
       `${domain.neighborhoods} neighbourhoods, ${requests} demo requests, ${field.teams} field teams, ` +
-      `${field.users} field staff, ${field.workOrders} demo work orders`,
+      `${field.users} field staff, ${field.workOrders} demo work orders, ` +
+      `${signals} MahallePulse/AI demo requests`,
   );
 }
 

@@ -68,6 +68,35 @@ export class CreateRequestDto {
   address?: string | null;
 }
 
+/** Preview analysis – the same fields a reporter fills in; nothing is stored. */
+export class AnalyzeRequestDto {
+  @ApiProperty({ example: 'Okul önündeki yolda büyük bir çukur var.' })
+  @Transform(trim)
+  @IsString()
+  @MinLength(10, { message: 'Analiz için açıklama en az 10 karakter olmalı.' })
+  @MaxLength(2000)
+  description!: string;
+
+  @ApiPropertyOptional({ minimum: -90, maximum: 90 })
+  @IsOptional()
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(-90)
+  @Max(90)
+  latitude?: number;
+
+  @ApiPropertyOptional({ minimum: -180, maximum: 180 })
+  @IsOptional()
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(-180)
+  @Max(180)
+  longitude?: number;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Seçilmiş kategori (benzerlik skoru için)' })
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string;
+}
+
 export class ListRequestsQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({ description: 'Talep no (tam), açıklama veya adres içinde arama' })
   @IsOptional()

@@ -6,3 +6,4 @@ export * from './municipality';
 export * from './requests';
 export * from './work-orders';
 export * from './operations';
+export * from './ai';

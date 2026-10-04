@@ -1,3 +1,4 @@
+import { type RequestAiAnalysis } from './ai';
 import {
   type Priority,
   type RecordStatus,
@@ -160,6 +161,12 @@ export interface RequestDetail extends RequestSummary {
   reporter: { id: string; fullName: string; email: string | null; phone: string | null } | null;
   media: RequestMediaItem[];
   timeline: RequestTimelineEvent[];
+  /** Citizens who joined this request instead of filing a duplicate (no names). */
+  supporterCount: number;
+  /** The current user joined (follows) this request. */
+  joined: boolean;
+  /** Latest AI analysis – municipal staff only (citizens get null). */
+  ai: RequestAiAnalysis | null;
   /** Work orders created from this request – municipal staff only (citizens get []). */
   workOrders: { id: string; publicNumber: string; status: WorkOrderStatus }[];
   /** What the current user may do next (the API enforces the same rules). */

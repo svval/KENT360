@@ -1,5 +1,6 @@
 import { seedDemoMunicipality, seedDemoUsers, seedRbac } from '../prisma/seed-data';
 import { seedMunicipalityDomain } from '../prisma/seed-domain';
+import { seedPulseSignals } from '../prisma/seed-pulse';
 import { seedDemoRequests } from '../prisma/seed-requests';
 import { seedDemoWorkOrders } from '../prisma/seed-work-orders';
 import { hashPassword } from '../src/modules/auth/domain/password-policy';
@@ -32,7 +33,8 @@ describe('Development seed (e2e)', () => {
       await seedMunicipalityDomain(t.prisma, municipalityId);
       const requests = await seedDemoRequests(t.prisma, municipalityId);
       const field = await seedDemoWorkOrders(t.prisma, municipalityId, hashPassword, put);
-      return { requests, ...field };
+      const signals = await seedPulseSignals(t.prisma, municipalityId);
+      return { requests, signals, ...field };
     };
     await runSeed();
     const counts = async () => ({
@@ -42,9 +44,9 @@ describe('Development seed (e2e)', () => {
       media: await t.prisma.workOrderMedia.count({ where: { workOrder: { municipalityId } } }),
     });
     const first = await counts();
-    expect(await runSeed()).toEqual({ requests: 0, teams: 0, users: 0, workOrders: 0 });
+    expect(await runSeed()).toEqual({ requests: 0, signals: 0, teams: 0, users: 0, workOrders: 0 });
     expect(await counts()).toEqual(first);
-    expect(first).toMatchObject({ requests: 120, workOrders: 45, teams: 5 });
+    expect(first).toMatchObject({ requests: 129, workOrders: 45, teams: 5 }); // 120 + 9 Phase 10–11
   });
 
   it('creates demo work orders that follow the API rules', async () => {

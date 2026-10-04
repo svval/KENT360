@@ -53,8 +53,15 @@ export const envSchema = z.object({
    */
   FIELD_LOCATION_BYPASS: booleanString.default(false),
 
-  AI_PROVIDER: z.enum(['mock']).default('mock'),
+  /**
+   * mock: deterministic keyword classifier (default, no key needed).
+   * anthropic: Claude via the official SDK – needs AI_API_KEY; without it, or on any
+   * provider error, the mock answers (the response says fallback: true).
+   */
+  AI_PROVIDER: z.enum(['mock', 'anthropic']).default('mock'),
   AI_API_KEY: z.string().optional(),
+  AI_MODEL: z.string().min(1).default('claude-opus-5'),
+  AI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60000).default(15000),
 });
 
 export type Env = z.infer<typeof envSchema>;

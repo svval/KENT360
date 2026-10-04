@@ -16,6 +16,7 @@ import { type AuthUser } from '../../common/auth/auth-user';
 import { AppException } from '../../common/errors/app.exception';
 import { ErrorCode } from '../../common/errors/error-codes';
 import { paginated, parseSort, toSkipTake } from '../../common/pagination/pagination';
+import { isUniqueViolation } from '../../common/utils/prisma-errors';
 import { parsePublicNumber } from '../../common/utils/public-number';
 import { type RequestMeta } from '../../common/utils/request-meta';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -23,6 +24,7 @@ import { AuditService } from '../audit/audit.service';
 import { effectiveSlaMinutes } from '../request-categories/domain/category-rules';
 import { NeighborhoodLocator } from '../neighborhoods/neighborhood-locator';
 import { NumberingService } from '../numbering/numbering.service';
+import { RequestAnalysisService } from '../ai/request-analysis.service';
 import { StorageService } from '../storage/storage.service';
 import {
   checkManualTransition,
@@ -75,6 +77,7 @@ export class RequestsService {
     private readonly numbering: NumberingService,
     private readonly locator: NeighborhoodLocator,
     private readonly storage: StorageService,
+    private readonly analysis: RequestAnalysisService,
   ) {}
 
   // ─── Create ─────────────────────────────────────────────────────────────
@@ -214,6 +217,18 @@ export class RequestsService {
       );
       return request.id;
     });
+    // AI suggestion + duplicate candidates for staff (best effort, never blocks filing).
+    await this.analysis.recordForRequest(
+      actor,
+      {
+        id,
+        description: dto.description,
+        latitude: dto.latitude,
+        longitude: dto.longitude,
+        categoryId: category.id,
+      },
+      meta,
+    );
     return this.get(actor, id);
   }
 
@@ -282,6 +297,13 @@ export class RequestsService {
       }),
     );
     const terminal = TERMINAL_STATUSES.has(record.status);
+    const joined =
+      record.createdById !== actor.id &&
+      (await this.prisma.requestFollower.findUnique({
+        where: { requestId_userId: { requestId: id, userId: actor.id } },
+        select: { userId: true },
+      })) !== null;
+    const analysis = staff ? record.aiAnalyses[0] : undefined;
     return {
       ...toRequestSummary(record, now),
       description: record.description,
@@ -300,6 +322,31 @@ export class RequestsService {
           : null,
       media,
       timeline: toTimeline(record.history, staff),
+      supporterCount: record.supporterCount,
+      joined,
+      ai: analysis
+        ? {
+            id: analysis.id,
+            provider: analysis.provider,
+            model: analysis.model,
+            category: analysis.suggestedCategory,
+            department: analysis.suggestedDepartment,
+            priority: analysis.prioritySuggestion,
+            confidence: analysis.confidence,
+            summary: analysis.summary,
+            reasoning: (analysis.rawResponse as { reasoning?: string } | null)?.reasoning ?? null,
+            accepted: analysis.accepted,
+            latencyMs: analysis.latencyMs,
+            createdAt: analysis.createdAt.toISOString(),
+            duplicates: record.duplicateMatches.map((d) => ({
+              requestId: d.matchedRequest.id,
+              publicNumber: d.matchedRequest.publicNumber,
+              score: d.score,
+              distanceMeters: Math.round(d.distanceMeters),
+              status: d.status,
+            })),
+          }
+        : null,
       workOrders: staff
         ? record.workOrders.map((wo) => ({
             id: wo.id,
@@ -544,6 +591,68 @@ export class RequestsService {
         tx,
       );
     });
+    return this.get(actor, id);
+  }
+
+  /**
+   * A citizen supports an existing request instead of filing a duplicate. Any open
+   * request of the municipality can be joined (the duplicate panel only shows public
+   * fields); joining makes it visible to the citizen (follower scope). Once per user;
+   * not your own request. No names are written to the citizen-facing timeline.
+   */
+  async join(actor: AuthUser, id: string, meta: RequestMeta): Promise<RequestDetail> {
+    const db = this.prisma.forTenant(actor.municipalityId);
+    const request = await db.request.findUnique({
+      where: { id },
+      select: { id: true, status: true, createdById: true },
+    });
+    if (!request) throw requestNotFound();
+    this.assertOpen(request.status);
+    if (request.createdById === actor.id) {
+      throw AppException.conflict(
+        ErrorCode.CANNOT_JOIN_OWN_REQUEST,
+        'Kendi oluşturduğunuz talebe katılamazsınız.',
+      );
+    }
+    const now = new Date();
+    try {
+      await db.$transaction(async (tx) => {
+        await tx.requestFollower.create({
+          data: { requestId: id, userId: actor.id, createdAt: now },
+        });
+        const updated = await tx.request.update({
+          where: { id },
+          data: { supporterCount: { increment: 1 } },
+          select: { supporterCount: true },
+        });
+        await this.history(
+          tx,
+          id,
+          actor,
+          'CITIZEN_JOINED',
+          'Bir vatandaş aynı sorunu bildirmek yerine bu talebe katıldı.',
+          now,
+          { metadata: { supporterCount: updated.supporterCount } },
+        );
+        await this.audit.record(
+          {
+            action: AuditAction.REQUEST_JOINED,
+            entityType: 'Request',
+            entityId: id,
+            municipalityId: actor.municipalityId,
+            userId: actor.id,
+            after: { supporterCount: updated.supporterCount },
+            meta,
+          },
+          tx,
+        );
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw AppException.conflict(ErrorCode.ALREADY_JOINED, 'Bu talebe zaten katıldınız.');
+      }
+      throw error;
+    }
     return this.get(actor, id);
   }
 

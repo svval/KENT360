@@ -40,9 +40,9 @@ describe('requestReadScope', () => {
     expect(requestReadScope(user(['TEAM_LEADER'], [REQUESTS_READ]))).toBeNull();
   });
 
-  it('limits citizens to their own requests', () => {
+  it('limits citizens to their own requests and the ones they joined', () => {
     expect(requestReadScope(user(['CITIZEN'], [REQUESTS_READ_OWN, REQUESTS_CREATE]))).toEqual({
-      createdById: 'u1',
+      OR: [{ createdById: 'u1' }, { followers: { some: { userId: 'u1' } } }],
     });
   });
 

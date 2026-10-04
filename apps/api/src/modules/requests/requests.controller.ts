@@ -20,6 +20,7 @@ import {
   Permission,
   REQUEST_MEDIA_LIMITS,
   type RequestDetail,
+  type RequestAnalysisResult,
   type RequestMediaItem,
   type RequestSummary,
 } from '@kent360/shared-types';
@@ -32,7 +33,9 @@ import {
   ReqMeta,
 } from '../../common/decorators/auth.decorators';
 import { type RequestMeta } from '../../common/utils/request-meta';
+import { RequestAnalysisService } from '../ai/request-analysis.service';
 import {
+  AnalyzeRequestDto,
   ChangeDepartmentDto,
   ChangePriorityDto,
   CreateRequestDto,
@@ -52,7 +55,26 @@ export class RequestsController {
   constructor(
     private readonly requests: RequestsService,
     private readonly media: RequestMediaService,
+    private readonly analysis: RequestAnalysisService,
   ) {}
+
+  @Post('analyze')
+  @HttpCode(HttpStatus.OK)
+  @Permissions(Permission.REQUESTS_CREATE)
+  @Throttle({ default: { limit: 60, ttl: 3_600_000 } })
+  @ApiOperation({
+    summary: 'Kaydetmeden AI önerisi + benzer bildirimler (hiçbir şey saklanmaz)',
+    description:
+      'Öneri: kategori, müdürlük, öncelik, güven, kısa gerekçe. Benzer bildirimler: 150 m, son 30 gün, ' +
+      'PostGIS mesafe + pg_trgm metin + kategori + zaman skoru (≥ 0,60 POSSIBLE_DUPLICATE). ' +
+      'Sağlayıcıya yalnız kişisel veriden arındırılmış açıklama gider.',
+  })
+  analyze(
+    @CurrentUser() actor: AuthUser,
+    @Body() dto: AnalyzeRequestDto,
+  ): Promise<RequestAnalysisResult> {
+    return this.analysis.preview(actor, dto);
+  }
 
   @Post()
   @Permissions(Permission.REQUESTS_CREATE)
@@ -109,6 +131,21 @@ export class RequestsController {
     @ReqMeta() meta: RequestMeta,
   ): Promise<RequestDetail> {
     return this.requests.transition(actor, id, dto, meta);
+  }
+
+  @Post(':id/join')
+  @HttpCode(HttpStatus.OK)
+  @Permissions(Permission.REQUESTS_CREATE)
+  @Throttle({ default: { limit: 30, ttl: 3_600_000 } })
+  @ApiOperation({
+    summary: 'Mevcut talebe katıl (audit: REQUEST_JOINED) – bir kez; kendi talebine değil',
+  })
+  join(
+    @CurrentUser() actor: AuthUser,
+    @Param('id', uuid) id: string,
+    @ReqMeta() meta: RequestMeta,
+  ): Promise<RequestDetail> {
+    return this.requests.join(actor, id, meta);
   }
 
   @Patch(':id/priority')
