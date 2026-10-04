@@ -24,6 +24,7 @@ import { RequestsModule } from './modules/requests/requests.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { FieldTeamsModule } from './modules/field-teams/field-teams.module';
 import { WorkOrdersModule } from './modules/work-orders/work-orders.module';
+import { OperationsModule } from './modules/operations/operations.module';
 
 @Module({
   imports: [
@@ -107,6 +108,7 @@ import { WorkOrdersModule } from './modules/work-orders/work-orders.module';
     RequestsModule,
     FieldTeamsModule,
     WorkOrdersModule,
+    OperationsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: AppThrottlerGuard },

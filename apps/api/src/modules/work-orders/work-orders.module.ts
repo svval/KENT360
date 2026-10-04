@@ -9,5 +9,6 @@ import { WorkOrdersService } from './work-orders.service';
   imports: [RequestsModule, FieldTeamsModule],
   controllers: [WorkOrdersController],
   providers: [WorkOrdersService, WorkOrderMediaService],
+  exports: [WorkOrdersService],
 })
 export class WorkOrdersModule {}

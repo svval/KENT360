@@ -17,6 +17,10 @@ export interface AuthUserProfile {
     logoUrl: string | null;
     primaryColor: string;
     secondaryColor: string;
+    /** Initial view of the operations map. */
+    mapCenterLat: number | null;
+    mapCenterLng: number | null;
+    mapZoom: number | null;
   };
   roles: { code: RoleCode | string; name: string }[];
   permissions: Permission[];

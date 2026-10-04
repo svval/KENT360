@@ -21,6 +21,9 @@ export const authUserSelect = {
       logoUrl: true,
       primaryColor: true,
       secondaryColor: true,
+      mapCenterLat: true,
+      mapCenterLng: true,
+      mapZoom: true,
     },
   },
   roles: {
