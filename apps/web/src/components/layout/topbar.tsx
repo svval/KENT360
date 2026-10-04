@@ -1,13 +1,13 @@
 'use client';
 
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { Bell, ChevronDown, LogOut, Menu, Search, UserRound } from 'lucide-react';
+import { Bell, ChevronDown, LogOut, Menu, UserRound } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 import { useAuth } from '@/providers/auth-provider';
 import { ApiStatus } from './api-status';
+import { GlobalSearch } from './global-search';
 import { findNavItem } from './navigation';
 
 interface TopbarProps {
@@ -53,28 +53,7 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
       </nav>
 
       <div className="ml-auto flex items-center gap-2 lg:gap-3">
-        <form
-          role="search"
-          className="relative hidden sm:block"
-          onSubmit={(e) => e.preventDefault()}
-        >
-          <label htmlFor="global-search" className="sr-only">
-            Talep no, adres veya açıklama ile ara
-          </label>
-          <Search
-            aria-hidden="true"
-            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted"
-          />
-          <input
-            id="global-search"
-            type="search"
-            placeholder="Talep no, adres, açıklama ara…"
-            className={cn(
-              'h-9 w-56 rounded-[var(--radius-control)] border border-border bg-background pr-3 pl-9 text-[13px] placeholder:text-muted/80 xl:w-80',
-              'focus-visible:border-primary focus-visible:bg-card focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-primary/25',
-            )}
-          />
-        </form>
+        <GlobalSearch />
 
         <ApiStatus />
 

@@ -39,3 +39,6 @@ npm-debug.log*
 *.swp
 .DS_Store
 Thumbs.db
+
+# Copied at dev/build time (scripts/copy-maplibre-worker.mjs)
+apps/web/public/maplibre/

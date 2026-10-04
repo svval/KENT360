@@ -3,7 +3,8 @@ import nextTypescript from 'eslint-config-next/typescript';
 import prettier from 'eslint-config-prettier';
 
 const config = [
-  { ignores: ['.next/**', 'node_modules/**', 'next-env.d.ts'] },
+  // public/maplibre: vendor worker copied at dev/build time (scripts/copy-maplibre-worker.mjs).
+  { ignores: ['.next/**', 'node_modules/**', 'next-env.d.ts', 'public/maplibre/**'] },
   ...nextCoreWebVitals,
   ...nextTypescript,
   {

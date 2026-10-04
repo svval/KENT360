@@ -4,7 +4,9 @@
   "private": true,
   "description": "KENT360 web – operations console and citizen portal (Next.js App Router)",
   "scripts": {
+    "predev": "node scripts/copy-maplibre-worker.mjs",
     "dev": "next dev --port 3000",
+    "prebuild": "node scripts/copy-maplibre-worker.mjs",
     "build": "next build",
     "start": "next start --port 3000",
     "lint": "eslint .",
@@ -21,6 +23,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.48.0",
+    "maplibre-gl": "^6.12.0",
     "next": "16.3.6",
     "react": "19.3.0",
     "react-dom": "19.3.0",

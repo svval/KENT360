@@ -1,19 +1,14 @@
 import type { Metadata } from 'next';
-import { ModulePlaceholder } from '@/components/layout/module-placeholder';
+import { Suspense } from 'react';
+import { MapView } from './map-view';
 
 export const metadata: Metadata = { title: 'Canlı Harita' };
 
 export default function MapPage() {
+  // Filters live in the URL (useSearchParams) – needs a Suspense boundary.
   return (
-    <ModulePlaceholder
-      href="/map"
-      phase="Phase 9"
-      capabilities={[
-        'Talep ve iş emri katmanları, marker kümeleme',
-        'Yoğunluk (heatmap) görünümü',
-        'Mahalle sınırları ve choropleth görünümü',
-        'Katman paneli: talepler, iş emirleri, kritik olaylar',
-      ]}
-    />
+    <Suspense>
+      <MapView />
+    </Suspense>
   );
 }

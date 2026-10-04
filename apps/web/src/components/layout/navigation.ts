@@ -52,9 +52,15 @@ export const navigation: NavSection[] = [
       {
         href: '/map',
         label: 'Canlı Harita',
-        description: 'Talepleri, iş emirlerini ve mahalle yoğunluğunu harita üzerinde izleyin.',
+        description:
+          'Talepleri, iş emirlerini ve mahalle sınırlarını canlı harita üzerinde izleyin.',
         icon: Map,
-        permission: Permission.REQUESTS_READ,
+        // Field staff see their own work orders on the map (no request layers).
+        permission: [
+          Permission.REQUESTS_READ,
+          Permission.WORK_ORDERS_READ,
+          Permission.WORK_ORDERS_READ_ASSIGNED,
+        ],
       },
       {
         href: '/requests',
