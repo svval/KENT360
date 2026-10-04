@@ -22,6 +22,8 @@ import { RequestCategoriesModule } from './modules/request-categories/request-ca
 import { NumberingModule } from './modules/numbering/numbering.module';
 import { RequestsModule } from './modules/requests/requests.module';
 import { StorageModule } from './modules/storage/storage.module';
+import { FieldTeamsModule } from './modules/field-teams/field-teams.module';
+import { WorkOrdersModule } from './modules/work-orders/work-orders.module';
 
 @Module({
   imports: [
@@ -103,6 +105,8 @@ import { StorageModule } from './modules/storage/storage.module';
     StorageModule,
     NumberingModule,
     RequestsModule,
+    FieldTeamsModule,
+    WorkOrdersModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: AppThrottlerGuard },

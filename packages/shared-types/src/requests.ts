@@ -4,6 +4,7 @@ import {
   type RequestSource,
   type RequestStatus,
   SlaStatus,
+  type WorkOrderStatus,
 } from './enums';
 
 // ─── Labels (UI_UX_GUIDE §6) ─────────────────────────────────────────────────
@@ -159,12 +160,15 @@ export interface RequestDetail extends RequestSummary {
   reporter: { id: string; fullName: string; email: string | null; phone: string | null } | null;
   media: RequestMediaItem[];
   timeline: RequestTimelineEvent[];
+  /** Work orders created from this request – municipal staff only (citizens get []). */
+  workOrders: { id: string; publicNumber: string; status: WorkOrderStatus }[];
   /** What the current user may do next (the API enforces the same rules). */
   actions: {
     transitions: RequestTransitionOption[];
     canChangePriority: boolean;
     canChangeDepartment: boolean;
     canAddMedia: boolean;
+    canCreateWorkOrder: boolean;
   };
   updatedAt: string;
 }

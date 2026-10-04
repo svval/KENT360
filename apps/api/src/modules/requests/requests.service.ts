@@ -30,6 +30,7 @@ import {
   SLA_STOPPED_STATUSES,
   statusChangeDescription,
   TERMINAL_STATUSES,
+  WORK_ORDER_STATUSES,
 } from './domain/request-status.machine';
 import { isMunicipalStaff, requestReadScope, requestTitle } from './domain/request-scope';
 import { atRiskRatioFrom, slaSnapshot } from './domain/sla-policy';
@@ -299,6 +300,13 @@ export class RequestsService {
           : null,
       media,
       timeline: toTimeline(record.history, staff),
+      workOrders: staff
+        ? record.workOrders.map((wo) => ({
+            id: wo.id,
+            publicNumber: wo.publicNumber,
+            status: wo.status,
+          }))
+        : [],
       actions: {
         transitions: manualTransitions(record.status, actor.permissions).map((rule) => ({
           to: rule.to,
@@ -306,8 +314,15 @@ export class RequestsService {
           requiresReason: rule.requiresReason ?? false,
         })),
         canChangePriority: !terminal && actor.permissions.has(Permission.REQUESTS_UPDATE),
-        canChangeDepartment: !terminal && actor.permissions.has(Permission.REQUESTS_ASSIGN),
+        canChangeDepartment:
+          !terminal &&
+          !WORK_ORDER_STATUSES.has(record.status) &&
+          actor.permissions.has(Permission.REQUESTS_ASSIGN),
         canAddMedia: this.canAddMedia(actor, record),
+        canCreateWorkOrder:
+          record.status === RequestStatus.ASSIGNED_TO_DEPARTMENT &&
+          record.department?.status === RecordStatus.ACTIVE &&
+          actor.permissions.has(Permission.WORK_ORDERS_CREATE),
       },
       updatedAt: record.updatedAt.toISOString(),
     };
@@ -396,6 +411,7 @@ export class RequestsService {
         data: {
           status: dto.to,
           ...(dto.to === RequestStatus.REJECTED && { rejectionReason: dto.reason, closedAt: now }),
+          ...(dto.to === RequestStatus.CLOSED && { closedAt: now }),
         },
       });
       if (count !== 1) {
@@ -479,6 +495,12 @@ export class RequestsService {
   ): Promise<RequestDetail> {
     const current = await this.findVisible(actor, id, { status: true, departmentId: true });
     this.assertOpen(current.status);
+    if (WORK_ORDER_STATUSES.has(current.status)) {
+      throw AppException.conflict(
+        ErrorCode.REQUEST_HAS_ACTIVE_WORK_ORDER,
+        'Talebin aktif bir iş emri var. Yönlendirmeden önce iş emrini iptal edin.',
+      );
+    }
     const department = await this.prisma.forTenant(actor.municipalityId).department.findUnique({
       where: { id: dto.departmentId },
       select: { id: true, name: true, status: true },

@@ -65,9 +65,11 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleCode, readonly Permission[]> =
     Permission.CATEGORIES_READ,
     Permission.NEIGHBORHOODS_READ,
   ],
+  // Team leaders see the work orders of the teams they belong to (object scope), not
+  // the whole department – that is workOrders.read (managers).
   [RoleCode.TEAM_LEADER]: [
     Permission.REQUESTS_READ,
-    Permission.WORK_ORDERS_READ,
+    Permission.WORK_ORDERS_READ_ASSIGNED,
     Permission.WORK_ORDERS_ASSIGN,
     Permission.WORK_ORDERS_EXECUTE,
     Permission.WORK_ORDERS_COMPLETE,

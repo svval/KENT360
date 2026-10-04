@@ -47,6 +47,12 @@ export const envSchema = z.object({
   /** Secure flag of the refresh cookie; defaults to true in production. */
   AUTH_COOKIE_SECURE: booleanString.optional(),
 
+  /**
+   * Development/demo only: accept field steps (ON_SITE, IN_PROGRESS) without a device
+   * position and without the distance check. Refused in production (see below).
+   */
+  FIELD_LOCATION_BYPASS: booleanString.default(false),
+
   AI_PROVIDER: z.enum(['mock']).default('mock'),
   AI_API_KEY: z.string().optional(),
 });
@@ -65,6 +71,9 @@ export function validateEnv(raw: Record<string, unknown>): Env {
   const env = parsed.data;
   if (env.NODE_ENV === 'production' && env.JWT_SECRET.startsWith('change-me')) {
     throw new Error('Refusing to start in production with the example JWT secret.');
+  }
+  if (env.NODE_ENV === 'production' && env.FIELD_LOCATION_BYPASS) {
+    throw new Error('FIELD_LOCATION_BYPASS must not be enabled in production.');
   }
   return env;
 }

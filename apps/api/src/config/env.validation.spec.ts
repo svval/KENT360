@@ -54,4 +54,14 @@ describe('validateEnv', () => {
       }),
     ).toThrow(/production/);
   });
+
+  it('keeps the field location check on unless a non-production env turns it off', () => {
+    expect(validateEnv(validEnv).FIELD_LOCATION_BYPASS).toBe(false);
+    expect(validateEnv({ ...validEnv, FIELD_LOCATION_BYPASS: 'true' }).FIELD_LOCATION_BYPASS).toBe(
+      true,
+    );
+    expect(() =>
+      validateEnv({ ...validEnv, NODE_ENV: 'production', FIELD_LOCATION_BYPASS: 'true' }),
+    ).toThrow(/FIELD_LOCATION_BYPASS/);
+  });
 });

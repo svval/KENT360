@@ -7,17 +7,12 @@ import { ErrorCode } from '../../common/errors/error-codes';
 import { type RequestMeta } from '../../common/utils/request-meta';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { StorageService } from '../storage/storage.service';
+import { ImageUploadService, type UploadedFile } from '../storage/image-upload.service';
 import { type ImageKind } from '../storage/image-signature';
-import { normalizeImage } from '../storage/image-normalizer';
+import { StorageService } from '../storage/storage.service';
 import { RequestsService } from './requests.service';
 
-/** What multer hands over (memory storage). The client's `originalname` is never used. */
-export interface UploadedFile {
-  buffer: Buffer;
-  mimetype: string;
-  size: number;
-}
+export type { UploadedFile };
 
 /**
  * Object key: server-generated from ids only, so no client input can influence the path
@@ -39,14 +34,14 @@ export class RequestMediaService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly storage: StorageService,
+    private readonly uploads: ImageUploadService,
     private readonly requests: RequestsService,
   ) {}
 
   /**
-   * Validates and normalises every file (signature, size, dimensions, decode, re-encode
-   * without metadata – see image-normalizer.ts), stores them in the private
-   * bucket, then records them with the timeline entry and audit record in one
-   * transaction. If that transaction fails, the uploaded objects are removed again.
+   * Stores the photos through the shared upload pipeline (ImageUploadService: validate,
+   * normalise without metadata, private bucket) and records them with the timeline entry
+   * and audit record in one transaction.
    */
   async upload(
     actor: AuthUser,
@@ -82,89 +77,74 @@ export class RequestMediaService {
       );
     }
 
-    // Every file is validated and re-encoded before anything is stored (no metadata kept).
-    const verified: { image: Awaited<ReturnType<typeof normalizeImage>>; key: string }[] = [];
-    for (const [index, file] of files.entries()) {
-      if (
-        file.size > REQUEST_MEDIA_LIMITS.maxBytes ||
-        file.buffer.length > REQUEST_MEDIA_LIMITS.maxBytes
-      ) {
-        throw new AppException(
-          ErrorCode.PAYLOAD_TOO_LARGE,
-          'Fotoğraf en fazla 10 MB olabilir.',
-          HttpStatus.PAYLOAD_TOO_LARGE,
-          { index },
-        );
-      }
-      const image = await normalizeImage(file.buffer, file.mimetype, index);
-      verified.push({ image, key: mediaObjectKey(actor.municipalityId, requestId, image.kind) });
-    }
-
-    const stored: string[] = [];
-    try {
-      for (const item of verified) {
-        await this.storage.put(item.key, item.image.buffer, item.image.kind.mimeType);
-        stored.push(item.key);
-      }
-      const now = new Date();
-      const rows = await this.prisma.forTenant(actor.municipalityId).$transaction(async (tx) => {
-        const created = await tx.requestMedia.createManyAndReturn({
-          data: verified.map((item) => ({
-            requestId,
-            storageKey: item.key,
-            mimeType: item.image.kind.mimeType,
-            sizeBytes: item.image.buffer.length,
-            uploadedById: actor.id,
-            createdAt: now,
-          })),
-          select: { id: true, storageKey: true, mimeType: true, sizeBytes: true, createdAt: true },
-        });
-        await this.requests.history(
-          tx,
-          requestId,
-          actor,
-          'MEDIA_ADDED',
-          created.length === 1 ? 'Fotoğraf eklendi.' : `${created.length} fotoğraf eklendi.`,
-          now,
-          { metadata: { mediaIds: created.map((m) => m.id) } },
-        );
-        await this.audit.record(
-          {
-            action: AuditAction.REQUEST_MEDIA_ADDED,
-            entityType: 'Request',
-            entityId: requestId,
-            municipalityId: actor.municipalityId,
-            userId: actor.id,
-            after: {
-              media: created.map((m) => ({
-                id: m.id,
-                mimeType: m.mimeType,
-                sizeBytes: m.sizeBytes,
-              })),
+    const rows = await this.uploads.store(
+      files,
+      REQUEST_MEDIA_LIMITS.maxBytes,
+      (kind) => mediaObjectKey(actor.municipalityId, requestId, kind),
+      (images) => {
+        const now = new Date();
+        return this.prisma.forTenant(actor.municipalityId).$transaction(async (tx) => {
+          const created = await tx.requestMedia.createManyAndReturn({
+            data: images.map((image) => ({
+              requestId,
+              storageKey: image.key,
+              mimeType: image.mimeType,
+              sizeBytes: image.sizeBytes,
+              uploadedById: actor.id,
+              createdAt: now,
+            })),
+            select: {
+              id: true,
+              storageKey: true,
+              mimeType: true,
+              sizeBytes: true,
+              createdAt: true,
             },
-            meta,
-          },
-          tx,
-        );
-        return created;
-      });
-      return Promise.all(
-        rows.map(async (row) => {
-          const signed = await this.storage.presignedUrl(row.storageKey);
-          return {
-            id: row.id,
-            mimeType: row.mimeType,
-            sizeBytes: row.sizeBytes,
-            createdAt: row.createdAt.toISOString(),
-            url: signed.url,
-            urlExpiresAt: signed.expiresAt.toISOString(),
-          };
-        }),
-      );
-    } catch (error) {
-      await Promise.all(stored.map((key) => this.storage.delete(key)));
-      throw error;
-    }
+          });
+          await this.requests.history(
+            tx,
+            requestId,
+            actor,
+            'MEDIA_ADDED',
+            created.length === 1 ? 'Fotoğraf eklendi.' : `${created.length} fotoğraf eklendi.`,
+            now,
+            { metadata: { mediaIds: created.map((m) => m.id) } },
+          );
+          await this.audit.record(
+            {
+              action: AuditAction.REQUEST_MEDIA_ADDED,
+              entityType: 'Request',
+              entityId: requestId,
+              municipalityId: actor.municipalityId,
+              userId: actor.id,
+              after: {
+                media: created.map((m) => ({
+                  id: m.id,
+                  mimeType: m.mimeType,
+                  sizeBytes: m.sizeBytes,
+                })),
+              },
+              meta,
+            },
+            tx,
+          );
+          return created;
+        });
+      },
+    );
+    return Promise.all(
+      rows.map(async (row) => {
+        const signed = await this.storage.presignedUrl(row.storageKey);
+        return {
+          id: row.id,
+          mimeType: row.mimeType,
+          sizeBytes: row.sizeBytes,
+          createdAt: row.createdAt.toISOString(),
+          url: signed.url,
+          urlExpiresAt: signed.expiresAt.toISOString(),
+        };
+      }),
+    );
   }
 
   /** A fresh short-lived URL for one photo (after the same access check as the request). */

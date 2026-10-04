@@ -46,6 +46,10 @@ export const requestDetailSelect = {
     select: { id: true, storageKey: true, mimeType: true, sizeBytes: true, createdAt: true },
     orderBy: { createdAt: 'asc' },
   },
+  workOrders: {
+    select: { id: true, publicNumber: true, status: true },
+    orderBy: { createdAt: 'asc' },
+  },
   history: {
     select: {
       id: true,

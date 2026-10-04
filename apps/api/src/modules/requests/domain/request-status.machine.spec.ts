@@ -78,6 +78,20 @@ describe('request status machine', () => {
     expect(manualTransitions(S.NEW, new Set())).toEqual([]);
   });
 
+  it('closes a verified request manually (Phase 6), never an unverified one', () => {
+    expect(checkManualTransition(S.VERIFIED, S.CLOSED, staff, undefined)).toMatchObject({
+      ok: true,
+    });
+    expect(checkManualTransition(S.RESOLVED, S.CLOSED, staff, undefined)).toMatchObject({
+      ok: false,
+      reason: 'INVALID',
+    });
+    expect(checkManualTransition(S.IN_PROGRESS, S.RESOLVED, staff, undefined)).toMatchObject({
+      ok: false,
+      reason: 'SYSTEM_ONLY',
+    });
+  });
+
   it('describes a status change for the timeline', () => {
     expect(statusChangeDescription(S.NEW, S.UNDER_REVIEW)).toBe('Durum: Yeni → İncelemede');
   });

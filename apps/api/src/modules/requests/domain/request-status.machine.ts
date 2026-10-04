@@ -7,7 +7,7 @@ import { Permission, REQUEST_STATUS_LABELS, RequestStatus } from '@kent360/share
  * re-shaping the machine:
  *   • `manual`: a person triggers it through POST /requests/:id/transitions (Phase 5);
  *   • `system`: another workflow triggers it – AI analysis (Phase 11), work orders
- *     (Phase 6), verification/closing (Phase 6). The manual endpoint refuses them.
+ *     (Phase 6, see work-order-sync.ts). The manual endpoint refuses them.
  */
 export type TransitionTrigger = 'manual' | 'system';
 
@@ -120,13 +120,26 @@ export const REQUEST_TRANSITIONS: readonly TransitionRule[] = [
   { from: S.IN_PROGRESS, to: S.RESOLVED, trigger: 'system', label: 'Çözüldü' },
   { from: S.RESOLVED, to: S.VERIFIED, trigger: 'system', label: 'Doğrulandı' },
   { from: S.RESOLVED, to: S.IN_PROGRESS, trigger: 'system', label: 'Çözüm kabul edilmedi' },
-  { from: S.VERIFIED, to: S.CLOSED, trigger: 'system', label: 'Kapatıldı' },
+  // Closing a verified request is a deliberate step of the department (Phase 6).
+  {
+    from: S.VERIFIED,
+    to: S.CLOSED,
+    trigger: 'manual',
+    permission: Permission.REQUESTS_UPDATE,
+    label: 'Talebi kapat',
+  },
 ];
 
 /** CLOSED and REJECTED end the lifecycle. */
 export const TERMINAL_STATUSES: ReadonlySet<RequestStatus> = new Set([S.CLOSED, S.REJECTED]);
 
 /** Statuses in which the request no longer runs against its SLA. */
+/** A work order of the request is active – the request follows it (work-order-sync.ts). */
+export const WORK_ORDER_STATUSES: ReadonlySet<RequestStatus> = new Set([
+  S.WORK_ORDER_CREATED,
+  S.IN_PROGRESS,
+]);
+
 export const SLA_STOPPED_STATUSES: ReadonlySet<RequestStatus> = new Set([
   S.RESOLVED,
   S.VERIFIED,
