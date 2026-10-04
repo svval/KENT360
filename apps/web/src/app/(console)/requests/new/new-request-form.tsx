@@ -45,6 +45,7 @@ import {
 import { createRequest, requestKeys, uploadRequestPhoto } from '@/lib/api/requests';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/providers/auth-provider';
+import { AiAssist } from './ai-assist';
 import { useToast } from '@/providers/toast-provider';
 
 /** Demo helper (development only): the story location of docs/DEMO_SCENARIO.md, in Karataş. */
@@ -588,6 +589,22 @@ export function NewRequestForm() {
               )}
             </CardContent>
           </Card>
+
+          <AiAssist
+            description={description}
+            latitude={latitude}
+            longitude={longitude}
+            categoryId={leaf?.id ?? null}
+            onApply={({ id, parentId }) => {
+              if (parentId) {
+                setRootId(parentId);
+                setLeafId(id);
+              } else {
+                setRootId(id);
+                setLeafId('');
+              }
+            }}
+          />
 
           {/* 4. Photos */}
           <Card>

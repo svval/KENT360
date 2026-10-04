@@ -26,6 +26,7 @@ import {
   RequestStatusBadge,
   WorkOrderStatusBadge,
 } from '@/components/domain/status-badges';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -36,6 +37,7 @@ import { getRequest, requestKeys, uploadRequestPhoto } from '@/lib/api/requests'
 import { cn, formatDateTime } from '@/lib/utils';
 import { PrivateImage } from '@/components/domain/private-image';
 import { useToast } from '@/providers/toast-provider';
+import { AiPanel } from './ai-panel';
 import { type RequestAction, RequestActionDialog } from './request-actions';
 
 /** Presigned photo URLs live 5 minutes; refresh the detail a little before they expire. */
@@ -111,6 +113,7 @@ export function RequestDetailView({ id }: { id: string }) {
               </h1>
               <RequestStatusBadge status={r.status} />
               <PriorityBadge priority={r.priority} />
+              {r.joined && <Badge tone="info">Bu talebi takip ediyorsunuz</Badge>}
             </div>
             <p className="mt-1 text-sm text-muted">
               {r.title} · <time dateTime={r.createdAt}>{formatDateTime(r.createdAt)}</time>
@@ -220,6 +223,11 @@ export function RequestDetailView({ id }: { id: string }) {
                   </div>
                 </InfoRow>
                 <InfoRow label="Kaynak">{REQUEST_SOURCE_LABELS[r.source]}</InfoRow>
+                {r.supporterCount > 0 && (
+                  <InfoRow label="Katılan vatandaş">
+                    {r.supporterCount} kişi aynı sorunu bildirmek yerine bu talebe katıldı
+                  </InfoRow>
+                )}
                 <InfoRow label="Oluşturulma">{formatDateTime(r.createdAt)}</InfoRow>
                 {r.reporter && (
                   <InfoRow label="Bildiren">
@@ -235,6 +243,8 @@ export function RequestDetailView({ id }: { id: string }) {
               </dl>
             </CardContent>
           </Card>
+
+          {r.ai && <AiPanel ai={r.ai} />}
 
           {r.workOrders.length > 0 && (
             <Card>
