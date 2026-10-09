@@ -1,21 +1,23 @@
 import { Compass } from 'lucide-react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
+import { StatusPage } from '@/components/layout/status-page';
 import { Button } from '@/components/ui/button';
-import { EmptyState } from '@/components/ui/empty-state';
+
+export const metadata: Metadata = { title: 'Sayfa bulunamadı' };
 
 export default function NotFound() {
   return (
-    <main className="flex min-h-dvh items-center justify-center p-6">
-      <EmptyState
-        icon={Compass}
-        title="Sayfa bulunamadı"
-        description="Aradığınız sayfa taşınmış veya hiç var olmamış olabilir."
-        action={
-          <Button asChild variant="secondary">
-            <Link href="/dashboard">Dashboard&apos;a dön</Link>
-          </Button>
-        }
-      />
-    </main>
+    <StatusPage
+      code="404"
+      icon={Compass}
+      title="Sayfa bulunamadı"
+      description="Aradığınız sayfa taşınmış, kaldırılmış veya hiç var olmamış olabilir."
+      actions={
+        <Button asChild>
+          <Link href="/dashboard">Dashboard&apos;a dön</Link>
+        </Button>
+      }
+    />
   );
 }

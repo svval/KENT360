@@ -265,7 +265,7 @@ export function NeighborhoodsView() {
               <CardDescription>
                 Aktif mahallelerin şematik görünümü (
                 {formatNumber(geojson.data?.features.length ?? 0)} mahalle). Etkileşimli harita
-                Canlı Harita modülünde (Phase 9).
+                Canlı Harita ekranında.
               </CardDescription>
             </div>
           </CardHeader>

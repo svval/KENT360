@@ -1,9 +1,11 @@
 'use client';
 
 import { ShieldAlert } from 'lucide-react';
+import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { type ReactNode, useEffect } from 'react';
 import { canAccessNavItem, findNavItem } from '@/components/layout/navigation';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -52,10 +54,16 @@ export function RoutePermissionGate({ children }: { children: ReactNode }) {
   if (item && !canAccessNavItem(item, hasPermission)) {
     return (
       <Card>
+        <h1 className="sr-only">Erişim engellendi</h1>
         <EmptyState
           icon={ShieldAlert}
           title="Bu sayfayı görüntüleme yetkiniz yok"
           description="Erişim gerekiyorsa belediyenizin sistem yöneticisiyle iletişime geçin."
+          action={
+            <Button asChild size="sm" variant="secondary">
+              <Link href="/dashboard">Dashboard&apos;a dön</Link>
+            </Button>
+          }
         />
       </Card>
     );

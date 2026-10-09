@@ -15,9 +15,10 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: 'KENT360 – Akıllı Belediye Operasyon Platformu',
-    template: '%s · KENT360',
+    default: 'KENT360 | Akıllı Belediye Operasyon ve Kent Zekâsı Platformu',
+    template: 'KENT360 | %s',
   },
+  applicationName: 'KENT360',
   description:
     'KENT360 – Akıllı Belediye Operasyon ve Kent Zekâsı Platformu. Vatandaş talepleri, saha operasyonları ve mahalle analitiği tek platformda.',
   robots: { index: false, follow: false },
