@@ -1,116 +1,101 @@
-# KENT360 – Demo Senaryosu
+# KENT360 – Demo Senaryosu (5–8 dakika)
 
-Bu senaryo, pilot sunumunda **12–15 dakikada** ürünün uçtan uca değerini göstermek için tasarlanmıştır. Seed verisi (Phase 4–6) bu akışı birebir destekleyecek şekilde üretilir.
+Uçtan uca hikâye: bir vatandaşın çukur bildirimi AI ile sınıflandırılır, mükerrer olduğu fark edilir, iş emrine dönüşür, saha ekibi önce/sonra kanıtıyla kapatır, yönetici doğrular; aynı veri MahallePulse, rapor ve audit ekranlarında görünür.
 
-> ⚠️ Aşağıdaki hesaplar ve parolalar **yalnızca development seed** içindir. Production ortamında seed çalıştırılmaz.
+> ⚠️ Hesaplar ve parolalar **yalnızca development seed** içindir. Production'da seed çalıştırılmaz.
 
-## Demo Belediyesi
+## Hazırlık (sunumdan önce, 2 dk)
 
-**Şahinbey Belediyesi / Gaziantep** (kurgusal demo kiracısı — belediye adı kodda değil, seed verisindedir).
-Seed mahalleleri: Karataş, Akkent, Güneykent, Dumlupınar, Binevler – **isimler gerçek, sınırlar demo geometridir** (basit dikdörtgenler, resmi sınır değil). Hikâye talebinin noktası (37.0585 K, 37.3710 D) Karataş poligonunun içindedir. Resmi sınırlar GeoJSON içe aktarma ile yüklenebilir.
+```powershell
+npm run infra:up
+npm run db:deploy
+npm run db:seed                  # ilk kurulumda
+npm run demo:refresh -- --yes    # demo verisini bugüne taşır (seed'den günler sonra)
+npm run dev
+```
+
+- `http://localhost:4000/health/ready` → `database: up`, `storage: up` olmalı (değilse `docker compose up -d --force-recreate minio`).
+- Saha adımları konum ister. Demo bilgisayarı demo mahallelerinde değilse yalnız geliştirme `.env`'inde `FIELD_LOCATION_BYPASS=true` kullanın (geçmişe "Konum kontrolü geliştirme modunda atlandı" yazılır) veya tarayıcının konum simülasyonunu (DevTools → Sensors) kullanın.
+- Tarayıcıda dört sekme / profil açın: yönetici, müdür, saha, vatandaş.
 
 ## Demo Hesapları
 
-| Rol                | E-posta                 | Parola         | Kişi                             |
-| ------------------ | ----------------------- | -------------- | -------------------------------- |
-| System Admin       | `admin@kent360.local`   | `Kent360!Demo` | Sistem Yöneticisi                |
-| Department Manager | `manager@kent360.local` | `Kent360!Demo` | Fen İşleri Müdürü                |
-| Team Leader        | `leader@kent360.local`  | `Kent360!Demo` | Fen İşleri – Ekip 1 sorumlusu    |
-| Field Staff        | `field@kent360.local`   | `Kent360!Demo` | Ahmet Kaya (Fen İşleri – Ekip 1) |
-| Citizen            | `citizen@kent360.local` | `Kent360!Demo` | Vatandaş                         |
+| Rol                 | E-posta                 | Parola         | Kişi                             |
+| ------------------- | ----------------------- | -------------- | -------------------------------- |
+| Sistem Yöneticisi   | `admin@kent360.local`   | `Kent360!Demo` | Sistem Yöneticisi                |
+| Müdürlük Yöneticisi | `manager@kent360.local` | `Kent360!Demo` | Elif Demir – Fen İşleri Müdürü   |
+| Ekip Sorumlusu      | `leader@kent360.local`  | `Kent360!Demo` | Fen İşleri – Ekip 1 sorumlusu    |
+| Saha Personeli      | `field@kent360.local`   | `Kent360!Demo` | Ahmet Kaya – Fen İşleri – Ekip 1 |
+| Vatandaş            | `citizen@kent360.local` | `Kent360!Demo` | Vatandaş                         |
 
-Phase 6 ek saha personeli (hepsi `Kent360!Demo`, Saha Personeli rolü): `mehmet.yilmaz@` (Fen İşleri – Ekip 2 sorumlusu), `hasan.celik@` (Ekip 2), `ayse.koc@` / `emre.aydin@` (Park ve Bahçeler – Merkez Ekip), `fatma.ozturk@` (Temizlik – Ekip 1), `burak.kurt@` (Zabıta – Merkez Ekip) – alan adı `kent360.local`.
+Ek saha personeli (hepsi `Kent360!Demo`): `mehmet.yilmaz@`, `hasan.celik@`, `ayse.koc@`, `emre.aydin@`, `fatma.ozturk@`, `burak.kurt@` – alan adı `kent360.local`.
 
-## Hazır Kayıtlar
+## Demo Verisi
 
-| Kayıt            | Değer                                                                                                                                            |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Hikâye talebi    | `KNT-2026-001248` – Karataş Mahallesi, yol çukuru                                                                                                |
-| Hikâye iş emri   | `WO-2026-000883` – Fen İşleri – Ekip 1, Ahmet Kaya                                                                                               |
-| AI önerisi       | Kategori: Yol ve Kaldırım / Yol Çukuru · Müdürlük: Fen İşleri · Öncelik: Yüksek · Risk: Orta · Güven: %94                                        |
-| Duplicate örneği | Karataş'ta 55 m uzakta, 3 saat önce açılmış benzer çukur talebi (skor ≈ 0.84)                                                                    |
-| Arka plan verisi | 120 demo talep (Phase 5 ✅) · 5 saha ekibi ve 45 iş emri (Phase 6 ✅: 28 doğrulanmış, 17 açık – oluşturuldu … tamamlandı; önce/sonra fotoğraflı) |
+**Şahinbey Belediyesi / Gaziantep** kurgusal demo kiracısıdır (belediye adı kodda değil, seed verisindedir). Mahalleler: Karataş, Akkent, Güneykent, Dumlupınar, Binevler – **isimler gerçek, sınırlar demo dikdörtgenleridir, resmi sınır değildir.**
+
+| Kayıt                 | İçerik                                                                                       |
+| --------------------- | -------------------------------------------------------------------------------------------- |
+| Arka plan             | 129 talep (son 90 gün), 5 saha ekibi, 45 iş emri (her durumda; önce/sonra fotoğraflı)        |
+| Anomali sinyali       | Karataş'ta son 6 günde 5 yol çukuru (önceki 4 haftada yok), Güneykent'te 4 çöp bildirimi     |
+| Mükerrer hedefi       | Karataş "okul önündeki yolda derin çukur" kümesi – en yenisi temiz seed'de `KNT-2026-000250` |
+| Sahaya atanmış iş     | `WO-2026-000037` – Ahmet Kaya'ya atanmış (durum: Atandı)                                     |
+| Doğrulama bekleyen iş | `WO-2026-000041` – Ahmet Kaya tamamladı, önce/sonra fotoğraflı                               |
+| Bildirimler           | Her demo hesabında küçük bir gelen kutusu + SLA taramasının ürettiği güncel uyarılar         |
+
+Numaralar temiz bir seed'e göredir; denemeler sırasında yeni kayıt açıldıysa listeden en güncelini seçin.
 
 ## Akış
 
-### Sahne 1 – Operasyon Merkezi (yönetici, 2 dk)
+### 1. Giriş (yönetici · 20 sn)
 
-1. `manager@kent360.local` ile giriş → **Kent Operasyon Merkezi**.
-2. KPI kartları: bugünkü talepler, açık/kritik talepler, açık iş emirleri, ortalama çözüm süresi, **SLA içinde çözüm %91,4**.
-3. Canlı harita: uzaklaştırınca kümeler, yaklaştırınca tekil talepler; **Katmanlar** panelinden _Yoğunluk_ (heatmap) ve _Mahalle Sınırları_.
-4. "Kritik Talepler" kartı: SLA'sı en yakın olan en üstte.
+`admin@kent360.local` → giriş. Sol menüde **Operasyon / Kent Zekâsı / Yönetim / Raporlama** grupları; menü yetkiye göre değişir.
 
-### Sahne 2 – Vatandaş bildirimi ve AI (vatandaş, 3 dk)
+### 2. Dashboard (yönetici · 45 sn)
 
-5. `citizen@kent360.local` → **Yeni Talep**.
-6. Fotoğraf yükle → haritada Karataş Mahallesi'nde bir nokta seç → mahalle **otomatik** doldurulur.
-7. Açıklama: _"Okul önündeki yolda büyük bir çukur var, araçlar sürekli çarpıyor."_
-8. **AI Önerisi** paneli: Yol Çukuru · Fen İşleri · Yüksek · %94 güven. Vatandaş önerileri değiştirebilir.
-9. **"Muhtemel benzer kayıt bulundu"** uyarısı: 55 m · aynı kategori · %88 metin benzerliği · 3 saat önce.
-   Seçenekler: _Mevcut bildirime katıl_ / _Yeni bildirim oluşturmaya devam et_.
-10. Yeni bildirim → `KNT-2026-…` numarası ve takip ekranı.
+**Kent Operasyon Merkezi:** bugünkü / açık / kritik talepler, açık iş emirleri, ortalama çözüm süresi, SLA uyumu; 30 günlük trend; kritik talepler (SLA'sı en yakın üstte); **Kent Zekâsı** kartında anomaliler. Zil simgesinde okunmamış bildirim sayısı (SLA aşıldı uyarıları).
 
-### Sahne 3 – Yönlendirme ve iş emri (yönetici, 3 dk)
+### 3. Canlı Harita (yönetici · 45 sn)
 
-11. Dashboard'da yeni talep görünür → **Talep detayı**: açıklama, fotoğraf, harita, AI analizi, SLA geri sayımı, **zaman çizelgesi**.
-12. **Fen İşleri Müdürlüğüne ata** → **İş emri oluştur** → **Fen İşleri – Ekip 1 / Ahmet Kaya**'ya ata.
-13. Toast: _"İş emri WO-2026-… Ahmet Kaya'ya atandı."_ Zaman çizelgesi güncellenir.
+**Canlı Harita:** uzaklaşınca kümeler, yaklaşınca tekil talepler; katmanlardan **Talep yoğunluğu** (ısı haritası) ve **Mahalle riski**. Karataş'a tıkla → risk kartı → **MahallePulse detayı** (sahne 10'da döneceğiz).
 
-### Sahne 4 – Saha360 (saha personeli, 3 dk)
+### 4. Vatandaş talebi (vatandaş · 30 sn)
 
-14. Mobil uygulamada `field@kent360.local` → _"Günaydın Ahmet · Bugün 8 göreviniz var."_
-15. KRİTİK / YÜKSEK kartlar, mesafe ve SLA sayacı → görev detayı → **Görevi Kabul Et** → **Yola Çıktım**.
-16. **Olay Yerindeyim**: konum doğrulaması (uzaktaysa _"İş emri konumuna henüz yeterince yakın değilsiniz."_).
-17. BEFORE fotoğrafı → **İşe Başla** → AFTER fotoğrafı → **İşi Tamamla** (AFTER olmadan tamamlanamaz).
+`citizen@kent360.local` → menüde yalnız **Dashboard** ve **Talepler** → **Yeni Talep**. Açıklama: _"Okulun önündeki yolda derin bir çukur var, araçlar zarar görüyor."_ → **Demo konumu kullan** (Karataş; mahalle otomatik bulunur).
 
-### Sahne 5 – Doğrulama ve kent zekâsı (yönetici, 3 dk)
+### 5. AI önerisi (vatandaş · 30 sn)
 
-18. İş emri detayında **Önce / Sonra** karşılaştırması → **Doğrula**.
-19. Talep **Çözüldü → Doğrulandı → Kapandı**; zaman çizelgesi baştan sona okunur.
-20. Dashboard KPI'ları ve harita güncellenir.
-21. **MahallePulse → Karataş**: toplam/açık/kritik talepler, ortalama çözüm süresi, en sık sorunlar, 30 günlük trend ve anomali uyarısı:
-    _"Karataş Mahallesi'nde park ekipmanı bildirimleri son 30 gün ortalamasına göre %46 arttı."_
-22. **Audit Log** (admin): atama, durum değişiklikleri, kim/ne zaman/hangi IP.
+**AI ile analiz et** → _Yol ve Kaldırım › Yol Çukuru · Fen İşleri · Yüksek · güven yüzdesi_, kısa gerekçe ve kaynak (kural tabanlı sınıflandırıcı ya da Claude). **Öneriyi uygula** formu doldurur; vatandaş değiştirebilir. Vurgu: _AI öneri üretir, karar vermez; kişisel veri analize gitmez._
+
+### 6. Mükerrer tespiti (vatandaş · 40 sn)
+
+Aynı kartta **Benzer bildirimler bulundu**: Karataş'taki çukur bildirimi, _"%95 benzer · 40 m uzakta · aynı kategori · 6 saat önce · metin %88 benzer"_ gibi açıklama. **Bu talebe katıl** → talep detayı, "Bu talebi takip ediyorsunuz" rozeti, isimsiz zaman çizelgesi. Yeni kayıt açılmadı; destekçi sayısı arttı.
+
+### 7. İş emrine dönüşüm (müdür · 1 dk)
+
+`manager@kent360.local` → zilde **Yeni talep** bildirimi → aynı talep (yalnız Fen İşleri kapsamını görür) → personel için **AI Analizi** paneli (öneri, güven, benzer talepler) → **İncelemeye al** → **Müdürlüğe ata** → **İş Emri Oluştur** → **Ekibe / personele ata**: _Fen İşleri – Ekip 1 / Ahmet Kaya_. Vatandaşa "Talebinizde gelişme" bildirimi gider.
+
+### 8. Saha kanıtı (saha · 1 dk)
+
+`field@kent360.local` → zilde **Yeni iş emri** → **Görevlerim** → iş emri (ya da hazır `WO-2026-000037`) → **Kabul et** → **Yola çık** → **Sahaya vardım** (PostGIS konum kontrolü; uzaktaysa _"İş emri konumuna henüz yeterince yakın değilsiniz"_) → **Önce** fotoğrafı → **İşe başla** → **Sonra** fotoğrafı + açıklama → **İşi tamamla** (sonra fotoğrafı olmadan tamamlanamaz).
+
+### 9. Müdür doğrulaması (müdür · 40 sn)
+
+Zilde **İş emri tamamlandı** → iş emri (ya da hazır `WO-2026-000041`) → **Önce / Sonra** karşılaştırması → **Doğrula**. Talep _Doğrulandı_ olur; vatandaşa **"Talebiniz çözüldü"** bildirimi gider. Gerekirse **Geri gönder** → saha ekibine "İş emri iade edildi" bildirimi.
+
+### 10. MahallePulse (yönetici · 45 sn)
+
+**MahallePulse** → risk sıralı tablo → **Karataş**: risk 0–100 ve bileşenleri (açık yük, SLA aşımı, kritik oran, artış, yavaş çözüm), kategori dağılımı, 30/90 gün trend, anomali: _"Karataş Mahallesi'nde yol çukuru bildirimleri son 7 günde 5 adet; önceki 4 haftada hiç yoktu."_ Vurgu: kural tabanlı ve açıklanabilir.
+
+### 11. Raporlar ve Audit (yönetici · 45 sn)
+
+**Raporlar:** dönem ve filtreler (müdürlük, kategori, durum, öncelik, mahalle) → özet (toplam, çözülen, SLA içinde, ortalama çözüm, açık iş emri), müdürlük ve mahalle performans tabloları → **Talep Raporu → CSV indir** (`kent360-talep-raporu-YYYY-AA-GG.csv`, Excel'de Türkçe karakterlerle açılır).
+**Audit:** filtre _İşlem = Talep durumu değişti_ → satır → **Detay**: kim, ne zaman, hangi IP, "Durum: Çözüldü → Doğrulandı" gibi okunabilir değişiklikler; parola, token, istek gövdesi gösterilmez.
 
 ## Sunum Notları
 
-- AI'nın **karar vermediğini**, öneri ürettiğini ve insan düzeltmelerinin kaydedildiğini vurgulayın.
-- Mükerrer tespitinin **açıklanabilir** olduğunu (mesafe/kategori/metin/zaman bileşenleri) gösterin.
-- Beyaz etiket: belediye adı, logo ve renklerin ayarlardan değiştiğini gösterin.
-
-## Phase 5 ile çalışan kısım
-
-Sahne 2'nin fotoğraf + konum + açıklama ile talep oluşturma bölümü (AI önerisi ve mükerrer uyarısı hariç) ve Sahne 3'ün "talep detayı, zaman çizelgesi, SLA, müdürlüğe atama" bölümü çalışır:
-
-1. `citizen@kent360.local` → **Talepler → Yeni Talep** → _Yol ve Kaldırım › Yol Çukuru_ (ilgili birim: Fen İşleri, hedef süre: 1 gün) → açıklama → **Demo konumu kullan** (Karataş) → fotoğraf → **Talebi gönder** → `KNT-2026-…` ve talep detayı.
-2. `manager@kent360.local` → **Talepler** (Fen İşleri kapsamı) → talep → **İncelemeye al** → **Müdürlüğe ata**; öncelik değişikliği; zaman çizelgesi güncellenir.
-3. `citizen@kent360.local` aynı talepte güncel durumu ve süreci görür (personel adları olmadan).
-
-## Phase 6 ile çalışan kısım (Sahne 3–5, web)
-
-1. `manager@kent360.local` → incelemedeki bir Fen İşleri talebi → **Müdürlüğe ata** → **İş Emri Oluştur** (talimat) → `WO-2026-…` detayı → **Ekibe / personele ata**: _Fen İşleri – Ekip 1 / Ahmet Kaya_ → toast _"WO-2026-…, Fen İşleri – Ekip 1 / Ahmet Kaya için atandı."_
-2. `field@kent360.local` → **Görevlerim** → iş emri → **Kabul et** → **Yola çık** → **Sahaya vardım** (tarayıcı konumu; uzaktaysa _"İş emri konumuna henüz yeterince yakın değilsiniz (… m; en fazla 150 m)."_) → "Önce" fotoğrafı → **İşe başla** → **İşi tamamla** (açıklama + "Sonra" fotoğrafı) → _"İş emri tamamlandı."_ Talep vatandaş için "Çözüldü".
-3. `manager@kent360.local` → iş emri → **Önce / Sonra** karşılaştırması → **Doğrula** → talepte **Talebi kapat**.
-
-Demo bilgisayarı belediye sınırında değilse konum adımı reddedilir – bu beklenen davranıştır. Sunumda tarayıcının konum simülasyonu (DevTools → Sensors) veya yalnız geliştirme ortamında `.env`'de `FIELD_LOCATION_BYPASS=true` kullanılabilir (geçmişe "Konum kontrolü geliştirme modunda atlandı" yazılır). Mobil Saha360 Phase 12'de aynı API ile gelir.
-
-Harita üzerinden nokta seçimi Phase 9'da, AI önerisi ve mükerrer uyarısı Phase 11'de eklenecek.
-
-## Phase 8–9 ile çalışan kısım (Sahne 1 ve 5)
-
-1. `admin@kent360.local` → **Dashboard**: 6 KPI, canlı harita (açık talepler, kritikler, aktif iş emirleri), 30 günlük trend, kritik talepler, son talepler.
-2. **Canlı Harita**: uzaklaşınca kümeler, yakınlaşınca tekil marker'lar; katman panelinden Talepler / Kritik / İş Emirleri / Mahalleler aç-kapat; bir kritik marker → kart → **Detaya git**; bir iş emri karesi → **İş emrine git**; filtre çubuğu (ör. öncelik = Kritik) adres çubuğunda kalır.
-3. Topbar'da `WO-2026-000046` veya `KNT-…` ara → Enter.
-4. `manager@kent360.local` aynı ekranlarda yalnız Fen İşleri'ni, `field@kent360.local` haritada yalnız kendi ekibinin iş emirlerini görür; vatandaş dashboard'da kısayol panelini görür.
-
-Not: demo talepleri seed anına göre son 90 güne yayılır; seed'den günler sonra açık taleplerin çoğu SLA'yı aşmış görünür ve kritik katmanında yer alır. Taze bir görünüm için demo veritabanını yeniden seed'leyin. Altlık için internet bağlantısı gerekir (OpenFreeMap).
-
-## Phase 10–11 ile çalışan kısım (Sahne 2 ve 5)
-
-1. `citizen@kent360.local` → **Yeni Talep** → açıklama "Okulun önündeki yolda derin bir çukur var…" → **Demo konumu kullan** → **AI ile analiz et**: _Yol ve Kaldırım › Yol Çukuru · Fen İşleri · Yüksek · %84 güven_ → **Öneriyi uygula**.
-2. Aynı kartta **Benzer bildirimler bulundu**: Karataş'taki demo çukur bildirimi (`%95 benzer`, "… m uzakta · aynı kategori · … saat önce · metin %… benzer") → **Bu talebe katıl** → talep detayı, "Bu talebi takip ediyorsunuz".
-3. `admin@kent360.local` → **Dashboard → Kent Zekâsı**: "Karataş Mahallesi'nde yol çukuru bildirimleri son 7 günde 5 adet; önceki 4 haftada hiç yoktu." → **Mahalleler**: risk sıralı tablo → Karataş detayı (risk 0–100 ve bileşenleri, kategori dağılımı, trend, anomali, harita).
-4. **Canlı Harita** → "Talep yoğunluğu" ve "Mahalle riski" katmanları → bir mahalleye tıkla → risk kartı.
-5. Talep detayında (personel) **AI Analizi**: öneri, güven, seçilen kategoriyle aynı mı, olası benzer talepler.
-
-Not: anomali ve mükerrer demosu seed anına göre üretilen 9 talebe dayanır; seed'den haftalar sonra "son 7 gün" boşalır – taze demo için veritabanını yeniden seed'leyin. `AI_PROVIDER=anthropic` ve `AI_API_KEY` verilirse öneriler Claude'dan gelir; anahtar yoksa kural tabanlı sınıflandırıcı çalışır.
+- **Kapsam:** müdür yalnız kendi müdürlüğünü (rapor dahil), saha personeli yalnız kendi/ekibinin işlerini, vatandaş yalnız kendi ve katıldığı taleplerini görür; başka belediyenin kaydı her zaman "bulunamadı".
+- **AI karar vermez;** sağlayıcı yoksa veya hata verirse kural tabanlı sınıflandırıcı devreye girer, akış bozulmaz.
+- **Mükerrer tespiti açıklanabilirdir** (mesafe / kategori / metin / zaman) ve otomatik birleştirme yapmaz.
+- **Beyaz etiket:** belediye adı, logo ve renkler **Belediye Profili** ekranından değişir.
+- Saha adımları bu sürümde web konsolundan yapılır; Saha360 mobil uygulaması opsiyonel bir gelecek uzantısıdır (aynı API).

@@ -205,3 +205,14 @@ Phase 4 ekranları (`/settings/*`) ortak kalıpları kullanır:
 - **AI önerisi:** otomatik değil, "AI ile analiz et" düğmesiyle; panelde kategori yolu, müdürlük, öncelik, güven yüzdesi, kısa gerekçe ve kaynak (kural tabanlı / model adı). "Öneriyi uygula" yalnız formu doldurur; kullanıcı değiştirebilir.
 - **Benzer bildirimler:** uyarı tonunda kart; her aday için numara, "%84 benzer", katılımcı sayısı, açıklama satırı ("55 m uzakta · aynı kategori · 3 saat önce · metin %88 benzer"); düğmeler "Detayı gör" (görebiliyorsa), "Bu talebe katıl" (vatandaş), "Yine de yeni talep oluştur".
 - **Talep detayı:** personel için "AI Analizi" kartı ("Öneri" rozeti, seçilen kategoriyle karşılaştırma, olası benzer talepler, "AI karar vermez" notu); vatandaşa gösterilmez. Katılan vatandaşa "Bu talebi takip ediyorsunuz" rozeti.
+
+## 19. Bildirimler, Raporlar, Audit ve Son Cila (Phase 13)
+
+- **Navigasyon:** Operasyon (Dashboard, Talepler, İş Emirleri, Canlı Harita) · Kent Zekâsı (MahallePulse) · Yönetim (Saha Ekipleri, Müdürlükler, Talep Kategorileri, Mahalle Sınırları, Belediye Profili) · Raporlama (Raporlar, Audit). Bildirimler ve Profil topbar'dan. Yetkisi olmayan menü öğesi gizlenir; vatandaş yalnız Dashboard ve Talepler görür.
+- **Zil:** okunmamış sayısı kırmızı rozetle (99+), `aria-label` "Bildirimler, N okunmamış"; açılır listede son 6 bildirim, tür ikonu, göreli zaman ("18 dk önce"), okunmamış nokta, "Tümünü okundu say", "Tümünü gör". Tıklanan bildirim okundu olur ve ilgili kayda gider.
+- **Bildirimler sayfası:** "Tümü / Okunmamış" sekmeleri (URL'de), tür rozeti, "Yeni" rozeti, sayfalama, boş durum.
+- **Raporlar:** filtre satırı + seçili dönem metni; 5 özet kartı (`tabular-nums`); müdürlük ve mahalle performans tabloları; 5 dışa aktarım kartı, indirme sırasında düğmede spinner, başarıda dosya adını söyleyen toast. Müdür için müdürlük filtresi yoktur ve kapsam metni gösterilir.
+- **Audit:** filtreler (kullanıcı, işlem, kaynak, kayıt kimliği, tarih) + tablo; "Detay" penceresinde kullanıcı, kaynak, işlem kodu, IP ve **Alan / Önce / Sonra** tablosu – durum, öncelik gibi kodlar Türkçe etiketle; ham JSON yok.
+- **Durum ekranları:** 404 ve beklenmeyen hata için marka işaretli tek kart (`StatusPage`); konsol içindeki hata kabuğu korur; yetkisiz sayfada "Bu sayfayı görüntüleme yetkiniz yok" + Dashboard'a dönüş (gizli `h1` ile).
+- **Kimlik:** favicon `app/icon.svg`, başlık şablonu `KENT360 | Sayfa`.
+- **Kabul ölçütleri:** her ana sayfada tek `h1`; yükleniyor / hata (Tekrar dene) / boş durumları; arayüzde "undefined / null / [object Object] / NaN" yok; 1440, 1024 ve 390 px'te yatay sayfa taşması yok (tablolar kendi içinde kayar).

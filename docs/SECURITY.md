@@ -101,6 +101,13 @@ Her kayıt: aktör, işlem, varlık türü/ID, önce/sonra, IP, user-agent, zama
 - **MahallePulse:** `analytics.read` + `requests.read`; müdürlük yöneticisi kendi müdürlüğü; vatandaş ve saha personeli 403.
 - **Saklama:** kapatılan taleplerin fotoğrafları için belediye bazlı saklama süresi (`settings.mediaRetentionDays`) 🗓.
 
+## 9.1 Bildirim, Rapor ve Audit Ekranı (Phase 13) ✅
+
+- **Bildirim sahipliği:** liste ve okundu işaretleme yalnız `userId = oturum sahibi` ve kendi belediyesi; başkasının bildirimi için 404 (varlık sızdırılmaz). Vatandaş iç bildirim türlerini sorgu düzeyinde de göremez; vatandaşa giden metinlerde personel adı ve iç ayrıntı yoktur. Kimse kendi eylemi için bildirim almaz.
+- **Raporlar:** `reports.export` + `requests.read`; müdürlük yöneticisi kendi müdürlüğü ile sınırlıdır ve filtreyle genişletemez. CSV formül enjeksiyonu (`= + - @`, sekme, CR) etkisizleştirilir; açıklama ve bildiren dışa aktarılmaz; `Cache-Control: no-store`; saatlik hız sınırı.
+- **Audit ekranı:** `audit.read` (sistem yöneticisi). Sırlar yazılırken temizlenir; ekran ayrıca gövde, prompt, başlık, tarayıcı ve oturum kimliği alanlarını hiç göstermez, ham JSON döndürmez. IP adresi yalnız bu yetkiye sahip kullanıcıya görünür.
+- **Son kontrol (web MVP):** refresh çerezi httpOnly + `SameSite=Strict` + `/api/v1/auth` yolu + üretimde `Secure`; refresh rotasyonu ve yeniden kullanım tespiti; Helmet başlıkları; CORS izin listesi (yalnız `Content-Disposition` açılır); medya imza + yeniden kodlama + private bucket + kısa ömürlü imzalı URL; AI PII maskeleme; arama, harita, dashboard, MahallePulse ve raporlar nesne kapsamını SQL'de uygular.
+
 ## 10. Secret Yönetimi ✅
 
 - `.env` git'e girmez (`.gitignore`); `.env.example` yalnızca development değerleri içerir.

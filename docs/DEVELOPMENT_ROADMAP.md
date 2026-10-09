@@ -1,26 +1,44 @@
 # KENT360 – Geliştirme Yol Haritası
 
-Durum: ✅ tamamlandı · 🟡 kısmen · ⬜ planlandı
+Durum: ✅ tamamlandı · ⏸ opsiyonel / ertelendi
+
+> **Web MVP tamamlandı.** Zorunlu bir sonraki geliştirme fazı yoktur; Phase 12 (Saha360 mobil) opsiyonel bir uzantıdır.
 
 İlke: **Önce uçtan uca MVP senaryosu kusursuz çalışır, sonra genişlik.** Her faz çalışır durumda ve testleri geçer halde bırakılır.
 
-| Faz | Kapsam                                                                     | Durum                            |
-| --- | -------------------------------------------------------------------------- | -------------------------------- |
-| 0   | Mimari, repository, dokümantasyon, monorepo                                | ✅                               |
-| 1   | Docker altyapısı, PostgreSQL/PostGIS, Redis, MinIO, Prisma şeması, env     | ✅ gerçek DB üzerinde doğrulandı |
-| 2   | Backend temeli: config, validation, hata formatı, loglama, Swagger, health | ✅                               |
-| 3   | Kimlik doğrulama ve yetkilendirme                                          | ✅                               |
-| 4   | Belediye domain'i: belediye, müdürlük, mahalle, kategori + seed            | ✅                               |
-| 5   | Talep yönetimi: talepler, medya, history, workflow, SLA                    | ✅                               |
-| 6   | İş emirleri: ekipler, atama, workflow, önce/sonra                          | ⬜                               |
-| 7   | Web temeli: login, layout, sidebar, topbar, tasarım sistemi                | ✅                               |
-| 8   | Yönetim arayüzü: dashboard, talepler, talep detayı, iş emirleri            | ⬜                               |
-| 9   | GIS: harita, kümeleme, heatmap, mahalleler                                 | ⬜                               |
-| 10  | MahallePulse: analitik, mahalle detayı                                     | ⬜                               |
-| 11  | AI: mock provider, sınıflandırma, öncelik, müdürlük önerisi, duplicate     | ⬜                               |
-| 12  | Saha360 mobil                                                              | ⬜                               |
-| 13  | Raporlar, bildirimler, audit arayüzü                                       | ⬜                               |
-| 14  | Test, güvenlik, performans, dokümantasyon, demo cilası                     | ⬜                               |
+| Faz | Kapsam                                                                          | Durum                                |
+| --- | ------------------------------------------------------------------------------- | ------------------------------------ |
+| 0   | Mimari, repository, dokümantasyon, monorepo                                     | ✅                                   |
+| 1   | Docker altyapısı, PostgreSQL/PostGIS, Redis, MinIO, Prisma şeması, env          | ✅                                   |
+| 2   | Backend temeli: config, validation, hata formatı, loglama, Swagger, health      | ✅                                   |
+| 3   | Kimlik doğrulama ve yetkilendirme                                               | ✅                                   |
+| 4   | Belediye domain'i: belediye, müdürlük, mahalle, kategori + seed                 | ✅                                   |
+| 5   | Talep yönetimi: talepler, medya, history, workflow, SLA                         | ✅                                   |
+| 6   | İş emirleri: ekipler, atama, workflow, önce/sonra                               | ✅                                   |
+| 7   | Web temeli: login, layout, sidebar, topbar, tasarım sistemi                     | ✅                                   |
+| 8   | Yönetim arayüzü: dashboard, arama                                               | ✅                                   |
+| 9   | GIS: harita, kümeleme, mahalleler                                               | ✅                                   |
+| 10  | MahallePulse: analitik, risk, anomali, ısı haritası, choropleth                 | ✅                                   |
+| 11  | AI: sağlayıcı soyutlaması, sınıflandırma, öncelik, mükerrer tespiti, katılma    | ✅                                   |
+| 12  | Saha360 mobil                                                                   | ⏸ Opsiyonel mobil uzantı / ertelendi |
+| 13  | Bildirimler, raporlar, audit arayüzü + son sağlamlaştırma, UI cilası, portfolyo | ✅ (eski Phase 14 dahil)             |
+
+--- | -------------------------------------------------------------------------- | -------------------------------- |
+| 0 | Mimari, repository, dokümantasyon, monorepo | ✅ |
+| 1 | Docker altyapısı, PostgreSQL/PostGIS, Redis, MinIO, Prisma şeması, env | ✅ gerçek DB üzerinde doğrulandı |
+| 2 | Backend temeli: config, validation, hata formatı, loglama, Swagger, health | ✅ |
+| 3 | Kimlik doğrulama ve yetkilendirme | ✅ |
+| 4 | Belediye domain'i: belediye, müdürlük, mahalle, kategori + seed | ✅ |
+| 5 | Talep yönetimi: talepler, medya, history, workflow, SLA | ✅ |
+| 6 | İş emirleri: ekipler, atama, workflow, önce/sonra | ⬜ |
+| 7 | Web temeli: login, layout, sidebar, topbar, tasarım sistemi | ✅ |
+| 8 | Yönetim arayüzü: dashboard, talepler, talep detayı, iş emirleri | ⬜ |
+| 9 | GIS: harita, kümeleme, heatmap, mahalleler | ⬜ |
+| 10 | MahallePulse: analitik, mahalle detayı | ⬜ |
+| 11 | AI: mock provider, sınıflandırma, öncelik, müdürlük önerisi, duplicate | ⬜ |
+| 12 | Saha360 mobil | ⬜ |
+| 13 | Raporlar, bildirimler, audit arayüzü | ⬜ |
+| 14 | Test, güvenlik, performans, dokümantasyon, demo cilası | ⬜ |
 
 ---
 
@@ -140,14 +158,25 @@ Durum: ✅ tamamlandı · 🟡 kısmen · ⬜ planlandı
 - ✅ **Testler:** risk / anomali / sınıflandırıcı / PII maskeleme / mükerrer skoru / sağlayıcı yedeği (unit) + metrikler, kapsam, kiracı, anomali eşiği, analiz, mükerrer adayları (yakın / uzak / eski / kapalı / başka belediye / pg_trgm), katılma, saklama temizliği (e2e)
 - ⏭ Görüntü analizi ve AI isabet raporu → ileride; bildirimler Phase 13
 
-## Phase 12 – Saha360 Mobil
+## Phase 12 – Saha360 Mobil ⏸ (opsiyonel uzantı)
 
-- Expo (React Native) uygulaması workspace'e eklenir; görevler, harita, bildirimler, profil; görev detayı ve workflow butonları; kamera ile önce/sonra; konum doğrulama + mock konum; SecureStore ile oturum
+- Web MVP kapsamı dışında bırakıldı. Saha adımları (kabul, yola çıkış, sahaya varış + PostGIS konum kontrolü, önce/sonra fotoğraf, tamamlama) web konsolunda çalışır.
+- Yapılırsa: Expo (React Native) uygulaması **aynı API** ile – görevler, harita, kamera ile önce/sonra, cihaz konumu, SecureStore ile oturum. Backend değişikliği gerekmez.
 
-## Phase 13 – Raporlar, Bildirimler, Audit UI
+## Phase 13 – Bildirimler, Raporlar, Audit + Web Final ✅
 
-- CSV raporlar, uygulama içi bildirimler (olay → bildirim), audit log ekranı, SLA risk tarayıcısı (periyodik iş)
+- ✅ **Bildirim gelen kutusu:** `GET /notifications` (sayfalı, `meta.unreadCount`), `PATCH /notifications/:id/read`, `POST /notifications/read-all`; yalnız kendi bildirimi (başkasınınki 404), vatandaş yalnız vatandaş türlerini görür
+- ✅ Olay → bildirim, iş akışıyla **aynı transaction'da**: yeni talep müdürlüğe (müdürler), kritik talep (yöneticiler), iş emri oluşturuldu / atandı / tamamlandı / geri gönderildi, vatandaşın takip ettiği talepte gelişme ve çözüm
+- ✅ SLA riskte / aşıldı: kuyruk altyapısı olmadan hafif periyodik tarama (`SLA_ALERT_INTERVAL_MS`, advisory lock, talep+tür başına bir kez, 7 günlük geriye bakış); aşım yöneticiye de gider
+- ✅ **Raporlar:** `GET /reports/summary` + 5 CSV (`requests`, `work-orders`, `sla`, `departments`, `neighborhoods`); UTF-8 BOM, `;` ayraç, formül enjeksiyonu koruması, anlamlı dosya adı; kapsam: yönetici belediye, müdür kendi müdürlüğü
+- ✅ **Audit ekranı:** `GET /audit` (kullanıcı, işlem, kaynak, kayıt, tarih filtreleri); değişiklikler okunabilir alan/değer listesi; sır, gövde, prompt, tarayıcı ve oturum bilgisi gösterilmez
+- ✅ Web: topbar zili (60 sn polling, okunmamış rozeti, son bildirimler), `/notifications`, `/reports` (özet, performans tabloları, CSV kartları), `/audit` (tablo + detay penceresi), `/profile`
+- ✅ Nihai navigasyon: Operasyon / Kent Zekâsı / Yönetim / Raporlama; vatandaş yalnız Dashboard + Talepler görür; placeholder sayfalar kaldırıldı
+- ✅ 404 / yetkisiz / beklenmeyen hata ekranları, favicon, `KENT360 | …` başlık şablonu
+- ✅ `npm run demo:refresh`: yalnız yerel demo DB'sinde, silmeden zaman kaydırma (kuru çalıştırma varsayılan)
+- ✅ Tarayıcı kabul testi (admin, müdür, saha, vatandaş; 1440 / 1024 / 390), konsol hatası yok
+- ✅ **Testler:** bildirim kuralları, CSV, rapor kapsamı ve aralığı, audit görünümü (unit) + bildirim sahipliği / okunmamış sayısı / okundu / tümü / sayfalama / SLA taraması, rapor kapsamı / kiracı / filtreler / CSV kodlaması ve enjeksiyon, audit yetkisi / filtreler / hassas alanlar / kiracı (e2e)
 
-## Phase 14 – Sağlamlaştırma
+## Olası sonraki adımlar (zorunlu değil)
 
-- Kritik akış e2e testi (login → talep → iş emri → atama → tamamlama), güvenlik gözden geçirme, sorgu planı kontrolü (EXPLAIN), erişilebilirlik denetimi, ekran görüntüleri, demo cilası
+Saha360 mobil uygulaması, e-posta / SMS bildirim kanalları, gerçek zamanlı güncelleme (SSE), AI isabet raporu ve görüntü analizi, çoklu API instance'ında Redis tabanlı rate limit.

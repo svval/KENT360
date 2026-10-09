@@ -46,7 +46,7 @@ Hata:
 | 400       | `VALIDATION_FAILED`                                                                   | DTO doğrulaması; `details` alan mesajları listesi |
 | 401       | `UNAUTHORIZED`                                                                        | Token yok / geçersiz / süresi dolmuş              |
 | 403       | `FORBIDDEN`                                                                           | Yetki yok ya da başka belediyenin kaydı           |
-| 404       | `NOT_FOUND`, `REQUEST_NOT_FOUND`, `WORK_ORDER_NOT_FOUND`                              |                                                   |
+| 404       | `NOT_FOUND`, `REQUEST_NOT_FOUND`, `WORK_ORDER_NOT_FOUND`, `NOTIFICATION_NOT_FOUND`    |                                                   |
 | 409       | `CONFLICT`, `INVALID_STATUS_TRANSITION`, `WORK_ORDER_STALE`, `FIELD_LOCATION_TOO_FAR` | Domain kuralı ihlali, eşzamanlı değişiklik        |
 | 413 / 415 | `PAYLOAD_TOO_LARGE`, `IMAGE_DIMENSIONS_TOO_LARGE` / `UNSUPPORTED_MEDIA_TYPE`          | Dosya yükleme                                     |
 | 429       | `RATE_LIMITED`                                                                        |                                                   |
@@ -211,13 +211,33 @@ Hata kodları: `WORK_ORDER_NOT_FOUND` (404), `WORK_ORDER_ALREADY_EXISTS` (409 �
 
 Mahalle başına: `total, open, resolved, critical` (açık + CRITICAL), `openWorkOrders, slaBreachPercent` (son 90 gün, SLA takipli taleplerde), `avgResolutionMinutes` (son 90 gün), `topCategory, last7, last30, previous30, changePercent, riskScore` (0–100), `riskLevel` (`LOW < 25 ≤ MEDIUM < 50 ≤ HIGH < 75 ≤ CRITICAL`), `riskFactors[]` (`key, label, value 0–1, points, detail`). Kapsam: yönetici belediye, müdürlük yöneticisi kendi müdürlüğü; vatandaş ve saha personeli 403. Isı haritası ayrı uç gerektirmez: `/map/requests` (bbox) verisini kullanır; choropleth bu listedeki `riskScore` değerleridir.
 
-### Reports / Notifications / Audit (Phase 13)
+### Bildirimler (Phase 13) ✅
 
-| Metot | Yol                                                                                 | İzin             |
-| ----- | ----------------------------------------------------------------------------------- | ---------------- |
-| GET   | `/reports/:type.csv`                                                                | `reports.export` |
-| GET   | `/notifications` · PATCH `/notifications/:id/read` · POST `/notifications/read-all` | oturum           |
-| GET   | `/audit`                                                                            | `audit.read`     |
+| Metot | Yol                       | İzin / kural                                                                                                  |
+| ----- | ------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| GET   | `/notifications`          | oturum – yalnız kendi bildirimleri, yeniden eskiye; `?page&pageSize&unread=true`; `meta.unreadCount`          |
+| PATCH | `/notifications/:id/read` | kendi bildirimi; başkasının / başka belediyenin / yok → `404 NOTIFICATION_NOT_FOUND`; tekrar çağrı idempotent |
+| POST  | `/notifications/read-all` | kendi okunmamışlarının hepsi → `{ updated }`                                                                  |
+
+Öğe: `id, type, title, message, createdAt, readAt, entityType ('Request' | 'WorkOrder' | null), entityId`. Vatandaş (iç okuma yetkisi olmayan kullanıcı) yalnız `REQUEST_UPDATED`, `REQUEST_VERIFIED`, `SYSTEM` türlerini görür. Gerçek zamanlı kanal yok; web 60 sn'de bir sorgular.
+
+### Raporlar (Phase 13) ✅
+
+| Metot | Yol                   | İzin                                                                                            |
+| ----- | --------------------- | ----------------------------------------------------------------------------------------------- |
+| GET   | `/reports/summary`    | `reports.export` + `requests.read` – özet + müdürlük ve mahalle performans satırları            |
+| GET   | `/reports/{type}.csv` | aynı – `requests`, `work-orders`, `sla`, `departments`, `neighborhoods`; bilinmeyen dosya → 404 |
+
+Filtreler (hepsi opsiyonel): `dateFrom`, `dateTo` (yerel gün `YYYY-MM-DD`, dahil; varsayılan son 30 gün, en fazla 2 yıl, ters aralık → `400 INVALID_DATE_RANGE`), `departmentId`, `categoryId` (ana kategori alt kategorileri kapsar), `status`, `priority`, `neighborhoodId`. Kapsam: yönetici belediye, müdürlük yöneticisi kendi müdürlüğü (filtreyle genişletilemez); vatandaş ve saha personeli 403.
+CSV: UTF-8 BOM, `;` ayraç, ondalık virgül, CRLF; `= + - @` (ve sekme / CR) ile başlayan metin hücreleri `'` ile etkisizleştirilir; `Content-Disposition: attachment; filename="kent360-talep-raporu-2026-10-04.csv"` (CORS'ta `Content-Disposition` açılır); satır sınırı 10 000; açıklama ve bildiren dışa aktarılmaz.
+
+### Audit (Phase 13) ✅
+
+| Metot | Yol      | İzin                                                                                                              |
+| ----- | -------- | ----------------------------------------------------------------------------------------------------------------- |
+| GET   | `/audit` | `audit.read` – kendi belediyesi, yeniden eskiye; `?user&action&entityType&entityId&dateFrom&dateTo&page&pageSize` |
+
+Öğe: `id, createdAt, action, entityType, entityId, actor { id, name, email } | null, ipAddress, changes[{ field, before, after }]`. `changes` yalnız değişen alanların düzleştirilmiş, okunabilir listesidir; parola / token / çerez / başlık / gövde / prompt / tarayıcı / oturum kimliği alanları hiç dönmez, ham JSON dönmez.
 
 ## 5. Durum Geçişi Uç Noktaları
 

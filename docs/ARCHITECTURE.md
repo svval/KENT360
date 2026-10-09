@@ -222,6 +222,13 @@ interface AIProvider {
 - Sağlayıcıya yalnızca **maskelenmiş açıklama** ve kategori listesi gönderilir (`maskPersonalData`: e-posta, telefon, kimlik no, IBAN); ad, iletişim, konum **gönderilmez**. Saklanan analizde açıklama yoktur: kodlar, eşleşen kelimeler, maskelenmiş tek cümlelik özet ve kısa gerekçe.
 - Öneri `ai_analyses` tablosuna yazılır; insan kararından sonra `accepted` alanı doldurulur → sınıflandırıcı isabet oranı ölçülebilir.
 
+## 8.1 Bildirimler ve SLA Uyarıları (Phase 13)
+
+- `modules/notifications` global modül: `NotificationsService.notify(tx, …)` iş akışı transaction'ı içinde çağrılır – bildirim, değişiklikle birlikte commit / rollback olur. Mesajlar saf fonksiyonlarda (`domain/notification-rules.ts`); kişi kendi eylemi için bildirim almaz.
+- Olaylar: talep oluşturuldu / yeniden yönlendirildi → müdürlüğün `requests.assign` sahipleri; kritik talep → belediye yöneticileri; iş emri oluşturuldu → müdürlüğün `workOrders.assign` sahipleri; atandı → personel ya da ekip sorumlusu; tamamlandı → oluşturan + doğrulayıcılar; geri gönderildi → yürüten; vatandaşa (bildiren + katılanlar) talep durumu, iş emri oluşturuldu / başladı / tamamlandı / doğrulandı. Vatandaş bildirimleri `RequestWorkOrderSync` içinde, zaman çizelgesi metniyle aynıdır.
+- **SLA riskte / aşıldı** zamanla oluşur; kuyruk altyapısı kurmadan `SlaAlertsService` periyodik ve idempotent tarama yapar (advisory lock ile tek instance). İleride BullMQ'ya taşınabilir (§11).
+- Teslimat: uygulama içi gelen kutusu + web'de 60 sn polling. E-posta / SMS / push ve SSE evrim yolundadır.
+
 ## 9. Dosya Depolama
 
 - Uygulama yalnızca **S3 protokolü** ile konuşur (`@aws-sdk/client-s3`); MinIO ↔ AWS S3 ↔ diğer S3 uyumlu servisler arasında geçiş env değişikliğidir.
