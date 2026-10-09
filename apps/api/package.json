@@ -21,6 +21,7 @@
     "db:reset": "prisma migrate reset",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
+    "demo:refresh": "tsx prisma/demo-refresh.ts",
     "db:validate": "prisma validate",
     "postinstall": "prisma generate"
   },

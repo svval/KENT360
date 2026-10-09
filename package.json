@@ -32,7 +32,8 @@
     "db:migrate": "npm run db:migrate -w @kent360/api",
     "db:deploy": "npm run db:deploy -w @kent360/api",
     "db:seed": "npm run db:seed -w @kent360/api",
-    "db:studio": "npm run db:studio -w @kent360/api"
+    "db:studio": "npm run db:studio -w @kent360/api",
+    "demo:refresh": "npm run demo:refresh -w @kent360/api --"
   },
   "devDependencies": {
     "concurrently": "^10.0.5",
