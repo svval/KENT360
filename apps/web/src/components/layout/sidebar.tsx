@@ -23,7 +23,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onNavigate }: Sidebar
   const sections = navigation
     .map((section) => ({
       ...section,
-      items: section.items.filter((item) => canAccessNavItem(item, hasPermission)),
+      items: section.items.filter((item) => !item.hidden && canAccessNavItem(item, hasPermission)),
     }))
     .filter((section) => section.items.length > 0);
 
@@ -61,12 +61,13 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onNavigate }: Sidebar
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4">
-        {sections.map((section) => (
+        {sections.map((section, index) => (
           <div key={section.id} className="mb-4 last:mb-0">
             {section.label && (
               <p
                 className={cn(
                   'mb-2 border-t border-white/10 px-3 pt-4 text-[11px] font-semibold tracking-wider text-slate-500 uppercase',
+                  index === 0 && 'border-t-0 pt-0',
                   collapsed && 'lg:px-0 lg:text-center lg:text-[0px]',
                 )}
               >

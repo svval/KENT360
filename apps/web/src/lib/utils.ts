@@ -23,3 +23,16 @@ const numberFormatter = new Intl.NumberFormat('tr-TR');
 export function formatNumber(value: number): string {
   return numberFormatter.format(value);
 }
+
+/** "az önce", "5 dk önce", "3 saat önce", "2 gün önce"; older → date and time. */
+export function formatRelative(iso: string | Date, now = Date.now()): string {
+  const time = typeof iso === 'string' ? new Date(iso).getTime() : iso.getTime();
+  const minutes = Math.round((now - time) / 60_000);
+  if (minutes < 1) return 'az önce';
+  if (minutes < 60) return `${minutes} dk önce`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} saat önce`;
+  const days = Math.round(hours / 24);
+  if (days < 7) return `${days} gün önce`;
+  return formatDateTime(new Date(time));
+}

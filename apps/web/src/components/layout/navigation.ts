@@ -2,7 +2,6 @@ import { Permission } from '@kent360/shared-types';
 import {
   Bell,
   Building2,
-  ChartNoAxesColumn,
   ClipboardList,
   FileText,
   FolderTree,
@@ -13,9 +12,8 @@ import {
   MapPinned,
   Network,
   ScrollText,
-  ShieldCheck,
   Truck,
-  Users,
+  UserRound,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -30,6 +28,10 @@ export interface NavItem {
    * without it and the page is gated. The API enforces the same rules.
    */
   permission?: Permission | readonly Permission[];
+  /** A second permission that is required as well (e.g. "staff only" for settings). */
+  alsoRequires?: Permission;
+  /** Reachable from the topbar (bell, user menu) instead of the sidebar. */
+  hidden?: boolean;
 }
 
 export interface NavSection {
@@ -41,6 +43,7 @@ export interface NavSection {
 export const navigation: NavSection[] = [
   {
     id: 'operations',
+    label: 'Operasyon',
     items: [
       {
         href: '/dashboard',
@@ -48,19 +51,6 @@ export const navigation: NavSection[] = [
         description:
           'Kent operasyonlarının anlık durumu, kritik olaylar ve performans göstergeleri.',
         icon: LayoutDashboard,
-      },
-      {
-        href: '/map',
-        label: 'Canlı Harita',
-        description:
-          'Talepleri, iş emirlerini ve mahalle sınırlarını canlı harita üzerinde izleyin.',
-        icon: Map,
-        // Field staff see their own work orders on the map (no request layers).
-        permission: [
-          Permission.REQUESTS_READ,
-          Permission.WORK_ORDERS_READ,
-          Permission.WORK_ORDERS_READ_ASSIGNED,
-        ],
       },
       {
         href: '/requests',
@@ -79,38 +69,32 @@ export const navigation: NavSection[] = [
         permission: [Permission.WORK_ORDERS_READ, Permission.WORK_ORDERS_READ_ASSIGNED],
       },
       {
-        href: '/field/teams',
-        label: 'Saha Ekipleri',
-        description: 'Müdürlüklerin saha ekipleri, sorumluları, üyeleri ve iş yükü.',
-        icon: Truck,
-        permission: Permission.FIELD_TEAMS_READ,
+        href: '/map',
+        label: 'Canlı Harita',
+        description:
+          'Talepleri, iş emirlerini ve mahalle sınırlarını canlı harita üzerinde izleyin.',
+        icon: Map,
+        // Field staff see their own work orders on the map (no request layers).
+        permission: [
+          Permission.REQUESTS_READ,
+          Permission.WORK_ORDERS_READ,
+          Permission.WORK_ORDERS_READ_ASSIGNED,
+        ],
       },
+    ],
+  },
+  {
+    id: 'intelligence',
+    label: 'Kent Zekâsı',
+    items: [
       {
         href: '/neighborhoods',
-        label: 'Mahalleler',
-        description: 'MahallePulse: mahalle bazında talep yoğunluğu, çözüm süreleri ve eğilimler.',
+        label: 'MahallePulse',
+        description:
+          'Mahalle bazında talep yoğunluğu, açıklanabilir risk skoru, eğilimler ve anomaliler.',
         icon: MapPinned,
         permission: Permission.ANALYTICS_READ,
-      },
-      {
-        href: '/analytics',
-        label: 'Analitik',
-        description: 'Kategori, mahalle, müdürlük ve öncelik bazında performans analizi.',
-        icon: ChartNoAxesColumn,
-        permission: Permission.ANALYTICS_READ,
-      },
-      {
-        href: '/reports',
-        label: 'Raporlar',
-        description: 'Aylık talep, SLA, mahalle ve müdürlük raporlarını dışa aktarın.',
-        icon: FileText,
-        permission: Permission.REPORTS_EXPORT,
-      },
-      {
-        href: '/notifications',
-        label: 'Bildirimler',
-        description: 'Size atanan işler, kritik talepler ve SLA uyarıları.',
-        icon: Bell,
+        alsoRequires: Permission.REQUESTS_READ,
       },
     ],
   },
@@ -119,38 +103,11 @@ export const navigation: NavSection[] = [
     label: 'Yönetim',
     items: [
       {
-        href: '/users',
-        label: 'Kullanıcılar',
-        description: 'Personel ve vatandaş hesaplarını, müdürlük bağlantılarını yönetin.',
-        icon: Users,
-        permission: Permission.USERS_MANAGE,
-      },
-      {
-        href: '/roles',
-        label: 'Roller ve Yetkiler',
-        description: 'Rollerin hangi işlemleri yapabileceğini belirleyin.',
-        icon: ShieldCheck,
-        permission: Permission.ROLES_MANAGE,
-      },
-      {
-        href: '/audit',
-        label: 'Audit Log',
-        description: 'Kritik işlemlerin değiştirilemez denetim kaydı.',
-        icon: ScrollText,
-        permission: Permission.AUDIT_READ,
-      },
-    ],
-  },
-  {
-    id: 'settings',
-    label: 'Ayarlar',
-    items: [
-      {
-        href: '/settings/municipality',
-        label: 'Belediye Profili',
-        description: 'Belediye bilgileri, iletişim, logo ve marka renkleri.',
-        icon: Building2,
-        permission: Permission.MUNICIPALITY_READ,
+        href: '/field/teams',
+        label: 'Saha Ekipleri',
+        description: 'Müdürlüklerin saha ekipleri, sorumluları, üyeleri ve iş yükü.',
+        icon: Truck,
+        permission: Permission.FIELD_TEAMS_READ,
       },
       {
         href: '/settings/departments',
@@ -158,6 +115,7 @@ export const navigation: NavSection[] = [
         description: 'Talepleri karşılayan müdürlükler ve durumları.',
         icon: Network,
         permission: Permission.DEPARTMENTS_READ,
+        alsoRequires: Permission.REQUESTS_READ,
       },
       {
         href: '/settings/categories',
@@ -165,6 +123,7 @@ export const navigation: NavSection[] = [
         description: 'Kategori ağacı, müdürlük yönlendirmesi, varsayılan öncelik ve SLA süreleri.',
         icon: FolderTree,
         permission: Permission.CATEGORIES_READ,
+        alsoRequires: Permission.REQUESTS_READ,
       },
       {
         href: '/settings/neighborhoods',
@@ -172,6 +131,56 @@ export const navigation: NavSection[] = [
         description: 'Mahalle listesi, sınır geometrileri ve GeoJSON içe aktarma.',
         icon: LandPlot,
         permission: Permission.NEIGHBORHOODS_READ,
+        alsoRequires: Permission.REQUESTS_READ,
+      },
+      {
+        href: '/settings/municipality',
+        label: 'Belediye Profili',
+        description: 'Belediye bilgileri, iletişim, logo ve marka renkleri.',
+        icon: Building2,
+        permission: Permission.MUNICIPALITY_READ,
+      },
+    ],
+  },
+  {
+    id: 'reporting',
+    label: 'Raporlama',
+    items: [
+      {
+        href: '/reports',
+        label: 'Raporlar',
+        description:
+          'Talep, iş emri, SLA, müdürlük ve mahalle performansı – ekranda özet, CSV olarak dışa aktarım.',
+        icon: FileText,
+        permission: Permission.REPORTS_EXPORT,
+        alsoRequires: Permission.REQUESTS_READ,
+      },
+      {
+        href: '/audit',
+        label: 'Audit',
+        description:
+          'Kritik işlemlerin değiştirilemez denetim kaydı: kim, ne zaman, neyi değiştirdi.',
+        icon: ScrollText,
+        permission: Permission.AUDIT_READ,
+      },
+    ],
+  },
+  {
+    id: 'user',
+    items: [
+      {
+        href: '/notifications',
+        label: 'Bildirimler',
+        description: 'Size atanan işler, SLA uyarıları ve takip ettiğiniz taleplerdeki gelişmeler.',
+        icon: Bell,
+        hidden: true,
+      },
+      {
+        href: '/profile',
+        label: 'Profilim',
+        description: 'Hesap bilgileriniz, rolleriniz ve yetkileriniz.',
+        icon: UserRound,
+        hidden: true,
       },
     ],
   },
@@ -180,9 +189,10 @@ export const navigation: NavSection[] = [
 const allItems = navigation.flatMap((section) => section.items);
 
 export function canAccessNavItem(
-  item: Pick<NavItem, 'permission'>,
+  item: Pick<NavItem, 'permission' | 'alsoRequires'>,
   hasPermission: (permission: Permission) => boolean,
 ): boolean {
+  if (item.alsoRequires && !hasPermission(item.alsoRequires)) return false;
   if (!item.permission) return true;
   const required = Array.isArray(item.permission)
     ? item.permission

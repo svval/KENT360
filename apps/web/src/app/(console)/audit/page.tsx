@@ -1,19 +1,13 @@
 import type { Metadata } from 'next';
-import { ModulePlaceholder } from '@/components/layout/module-placeholder';
+import { Suspense } from 'react';
+import { AuditView } from './audit-view';
 
-export const metadata: Metadata = { title: 'Audit Log' };
+export const metadata: Metadata = { title: 'Audit' };
 
 export default function AuditPage() {
   return (
-    <ModulePlaceholder
-      href="/audit"
-      phase="Phase 13"
-      capabilities={[
-        'Kullanıcı, işlem ve kayıt türüne göre filtreleme',
-        'Değişiklik öncesi / sonrası veri karşılaştırması',
-        'IP ve istemci bilgisi',
-        'Değiştirilemez (append-only) kayıt',
-      ]}
-    />
+    <Suspense>
+      <AuditView />
+    </Suspense>
   );
 }

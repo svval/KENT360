@@ -1,7 +1,7 @@
 'use client';
 
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { Bell, ChevronDown, LogOut, Menu, UserRound } from 'lucide-react';
+import { ChevronDown, LogOut, Menu, UserRound } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { useAuth } from '@/providers/auth-provider';
 import { ApiStatus } from './api-status';
 import { GlobalSearch } from './global-search';
 import { findNavItem } from './navigation';
+import { NotificationBell } from './notification-bell';
 
 interface TopbarProps {
   onOpenMobileNav: () => void;
@@ -57,11 +58,7 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
 
         <ApiStatus />
 
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/notifications" aria-label="Bildirimler">
-            <Bell />
-          </Link>
-        </Button>
+        <NotificationBell />
 
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
@@ -91,9 +88,14 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
                 <span className="block truncate font-medium text-foreground">{user?.email}</span>
                 {user && <span className="block truncate">{user.municipality.name}</span>}
               </DropdownMenu.Label>
-              <DropdownMenu.Item className="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-[13px] outline-none data-[highlighted]:bg-subtle">
-                <UserRound className="size-4 text-muted" aria-hidden="true" />
-                Profilim
+              <DropdownMenu.Item asChild>
+                <Link
+                  href="/profile"
+                  className="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-[13px] outline-none data-[highlighted]:bg-subtle"
+                >
+                  <UserRound className="size-4 text-muted" aria-hidden="true" />
+                  Profilim
+                </Link>
               </DropdownMenu.Item>
               <DropdownMenu.Separator className="my-1 h-px bg-border" />
               <DropdownMenu.Item
