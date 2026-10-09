@@ -25,6 +25,9 @@ import { StorageModule } from './modules/storage/storage.module';
 import { FieldTeamsModule } from './modules/field-teams/field-teams.module';
 import { WorkOrdersModule } from './modules/work-orders/work-orders.module';
 import { OperationsModule } from './modules/operations/operations.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { ReportsModule } from './modules/reports/reports.module';
+import { AuditLogModule } from './modules/audit/audit-log.module';
 
 @Module({
   imports: [
@@ -109,6 +112,9 @@ import { OperationsModule } from './modules/operations/operations.module';
     FieldTeamsModule,
     WorkOrdersModule,
     OperationsModule,
+    NotificationsModule,
+    ReportsModule,
+    AuditLogModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: AppThrottlerGuard },

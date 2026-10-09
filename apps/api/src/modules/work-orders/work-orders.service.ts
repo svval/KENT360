@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import {
   AuditAction,
   type Paginated,
+  NotificationType,
   Permission,
   RecordStatus,
   RequestStatus,
@@ -26,6 +27,12 @@ import { AuditService } from '../audit/audit.service';
 import { FieldTeamsService, fieldStaffWhere } from '../field-teams/field-teams.service';
 import { NumberingService } from '../numbering/numbering.service';
 import { type WorkOrderSyncEvent } from '../requests/domain/work-order-sync';
+import {
+  workOrderCompletedNotification,
+  workOrderCreatedNotification,
+  workOrderReturnedNotification,
+} from '../notifications/domain/notification-rules';
+import { NotificationsService } from '../notifications/notifications.service';
 import { RequestWorkOrderSync } from '../requests/request-work-order-sync.service';
 import { RequestsService } from '../requests/requests.service';
 import { StorageService } from '../storage/storage.service';
@@ -122,6 +129,7 @@ export class WorkOrdersService {
     private readonly sync: RequestWorkOrderSync,
     private readonly teams: FieldTeamsService,
     private readonly storage: StorageService,
+    private readonly notifications: NotificationsService,
     config: ConfigService<Env, true>,
   ) {
     this.locationBypass = config.get('FIELD_LOCATION_BYPASS', { infer: true });
@@ -241,6 +249,22 @@ export class WorkOrdersService {
           workOrder: { id: workOrder.id, publicNumber },
           at: now,
           meta,
+        });
+        // Other managers of the department see the new work waiting for a team.
+        await this.notifications.notify(tx, {
+          municipalityId: actor.municipalityId,
+          recipients: await this.notifications.departmentStaff(
+            tx,
+            departmentId,
+            Permission.WORK_ORDERS_ASSIGN,
+          ),
+          actorId: actor.id,
+          content: workOrderCreatedNotification({
+            workOrderId: workOrder.id,
+            publicNumber,
+            requestNumber: request.publicNumber,
+          }),
+          at: now,
         });
         return workOrder.id;
       });
@@ -575,22 +599,21 @@ export class WorkOrdersService {
         },
         tx,
       );
-      // In-app notification (Phase 13 adds the inbox UI and other channels).
+      // In-app notification to the person (or team leader) who now carries the work.
       const recipient = assignedUserId ?? team?.leaderId ?? null;
-      if (recipient && recipient !== actor.id) {
-        await tx.notification.create({
-          data: {
-            municipalityId: actor.municipalityId,
-            userId: recipient,
-            type: 'WORK_ORDER_ASSIGNED',
-            title: `Yeni iş emri: ${current.publicNumber}`,
-            body: `${target} için bir iş emri atandı.`.slice(0, 1000),
-            entityType: 'WorkOrder',
-            entityId: id,
-            createdAt: now,
-          },
-        });
-      }
+      await this.notifications.notify(tx, {
+        municipalityId: actor.municipalityId,
+        recipients: [recipient],
+        actorId: actor.id,
+        content: {
+          type: NotificationType.WORK_ORDER_ASSIGNED,
+          title: `Yeni iş emri: ${current.publicNumber}`,
+          message: `${target} için bir iş emri atandı.`.slice(0, 1000),
+          entityType: 'WorkOrder',
+          entityId: id,
+        },
+        at: now,
+      });
     });
     return this.get(ctx, id);
   }
@@ -620,9 +643,12 @@ export class WorkOrdersService {
       status: true,
       publicNumber: true,
       requestId: true,
+      departmentId: true,
+      createdById: true,
       fieldTeamId: true,
       assignedUserId: true,
       startedAt: true,
+      fieldTeam: { select: { leaderId: true } },
     });
     if (dto.from && dto.from !== current.status) throw stale();
     if ((dto.latitude === undefined) !== (dto.longitude === undefined)) {
@@ -775,6 +801,38 @@ export class WorkOrdersService {
           workOrder: { id, publicNumber: current.publicNumber },
           at: now,
           meta,
+        });
+      }
+      if (rule.event === 'COMPLETED') {
+        // Whoever verifies: the creator and the department's verifiers.
+        await this.notifications.notify(tx, {
+          municipalityId: actor.municipalityId,
+          recipients: [
+            current.createdById,
+            ...(await this.notifications.departmentStaff(
+              tx,
+              current.departmentId,
+              Permission.WORK_ORDERS_VERIFY,
+            )),
+          ],
+          actorId: actor.id,
+          content: workOrderCompletedNotification({
+            workOrderId: id,
+            publicNumber: current.publicNumber,
+          }),
+          at: now,
+        });
+      } else if (rule.event === 'RETURNED') {
+        await this.notifications.notify(tx, {
+          municipalityId: actor.municipalityId,
+          recipients: [current.assignedUserId ?? current.fieldTeam?.leaderId],
+          actorId: actor.id,
+          content: workOrderReturnedNotification({
+            workOrderId: id,
+            publicNumber: current.publicNumber,
+            reason: dto.reason ?? null,
+          }),
+          at: now,
         });
       }
     });

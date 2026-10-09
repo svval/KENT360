@@ -6,6 +6,8 @@ import { AppException } from '../../common/errors/app.exception';
 import { ErrorCode } from '../../common/errors/error-codes';
 import { type RequestMeta } from '../../common/utils/request-meta';
 import { type AuditWriter, AuditService } from '../audit/audit.service';
+import { citizenRequestUpdate } from '../notifications/domain/notification-rules';
+import { type NotificationDb, NotificationsService } from '../notifications/notifications.service';
 import {
   REQUIRED_SYNC_EVENTS,
   requestSyncStep,
@@ -13,21 +15,22 @@ import {
 } from './domain/work-order-sync';
 
 /** The (tenant-scoped) transaction of the work order change. */
-export type RequestSyncDb = AuditWriter & {
-  request: {
-    findUnique(args: {
-      where: { id: string };
-      select: { status: true };
-    }): PromiseLike<{ status: RequestStatus } | null>;
-    updateMany(args: {
-      where: Prisma.RequestWhereInput;
-      data: Prisma.RequestUncheckedUpdateManyInput;
-    }): PromiseLike<{ count: number }>;
+export type RequestSyncDb = AuditWriter &
+  NotificationDb & {
+    request: {
+      findUnique(args: {
+        where: { id: string };
+        select: { status: true; publicNumber: true };
+      }): PromiseLike<{ status: RequestStatus; publicNumber: string } | null>;
+      updateMany(args: {
+        where: Prisma.RequestWhereInput;
+        data: Prisma.RequestUncheckedUpdateManyInput;
+      }): PromiseLike<{ count: number }>;
+    };
+    requestHistory: {
+      create(args: { data: Prisma.RequestHistoryUncheckedCreateInput }): PromiseLike<unknown>;
+    };
   };
-  requestHistory: {
-    create(args: { data: Prisma.RequestHistoryUncheckedCreateInput }): PromiseLike<unknown>;
-  };
-};
 
 /**
  * Applies the request side of a work order step (domain/work-order-sync.ts) inside the
@@ -37,7 +40,10 @@ export type RequestSyncDb = AuditWriter & {
  */
 @Injectable()
 export class RequestWorkOrderSync {
-  constructor(private readonly audit: AuditService) {}
+  constructor(
+    private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async apply(
     tx: RequestSyncDb,
@@ -53,7 +59,7 @@ export class RequestWorkOrderSync {
     const { actor, requestId, event, workOrder, at, meta } = input;
     const request = await tx.request.findUnique({
       where: { id: requestId },
-      select: { status: true },
+      select: { status: true, publicNumber: true },
     });
     if (!request) return; // the request was removed; the work order stands on its own
     const step = requestSyncStep(event, request.status);
@@ -106,5 +112,28 @@ export class RequestWorkOrderSync {
       },
       tx,
     );
+    // Citizens following the request hear about visible progress, in timeline words.
+    if (CITIZEN_EVENTS.has(event)) {
+      await this.notifications.notify(tx, {
+        municipalityId: actor.municipalityId,
+        recipients: await this.notifications.citizenWatchers(tx, requestId),
+        actorId: actor.id,
+        content: citizenRequestUpdate({
+          requestId,
+          publicNumber: request.publicNumber,
+          description: step.description,
+          verified: event === 'VERIFIED',
+        }),
+        at,
+      });
+    }
   }
 }
+
+/** Work order steps a citizen is told about (returns / cancellations stay internal). */
+const CITIZEN_EVENTS: ReadonlySet<WorkOrderSyncEvent> = new Set([
+  'CREATED',
+  'STARTED',
+  'COMPLETED',
+  'VERIFIED',
+]);

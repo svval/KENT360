@@ -4,6 +4,7 @@ import {
   type Paginated,
   Permission,
   PRIORITY_LABELS,
+  Priority,
   RecordStatus,
   type RequestDetail,
   RequestSource,
@@ -25,6 +26,12 @@ import { effectiveSlaMinutes } from '../request-categories/domain/category-rules
 import { NeighborhoodLocator } from '../neighborhoods/neighborhood-locator';
 import { NumberingService } from '../numbering/numbering.service';
 import { RequestAnalysisService } from '../ai/request-analysis.service';
+import {
+  citizenStatusChange,
+  requestAssignedNotification,
+  requestCriticalNotification,
+} from '../notifications/domain/notification-rules';
+import { NotificationsService } from '../notifications/notifications.service';
 import { StorageService } from '../storage/storage.service';
 import {
   checkManualTransition,
@@ -78,6 +85,7 @@ export class RequestsService {
     private readonly locator: NeighborhoodLocator,
     private readonly storage: StorageService,
     private readonly analysis: RequestAnalysisService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // ─── Create ─────────────────────────────────────────────────────────────
@@ -215,6 +223,37 @@ export class RequestsService {
         },
         tx,
       );
+      await this.notifications.notify(tx, {
+        municipalityId: actor.municipalityId,
+        recipients: await this.notifications.departmentStaff(
+          tx,
+          department.id,
+          Permission.REQUESTS_ASSIGN,
+        ),
+        actorId: actor.id,
+        content: requestAssignedNotification({
+          requestId: request.id,
+          publicNumber,
+          categoryName: category.name,
+          neighborhoodName: neighborhood?.name ?? null,
+          departmentName: department.name,
+          priority: category.defaultPriority,
+        }),
+        at: now,
+      });
+      if (category.defaultPriority === Priority.CRITICAL) {
+        await this.notifications.notify(tx, {
+          municipalityId: actor.municipalityId,
+          recipients: await this.notifications.municipalityAdmins(tx),
+          actorId: actor.id,
+          content: requestCriticalNotification({
+            requestId: request.id,
+            publicNumber,
+            title: requestTitle(category.name, neighborhood?.name ?? null),
+          }),
+          at: now,
+        });
+      }
       return request.id;
     });
     // AI suggestion + duplicate candidates for staff (best effort, never blocks filing).
@@ -414,6 +453,7 @@ export class RequestsService {
   ): Promise<RequestDetail> {
     const current = await this.findVisible(actor, id, {
       status: true,
+      publicNumber: true,
       department: { select: { status: true } },
     });
     const check = checkManualTransition(current.status, dto.to, actor.permissions, dto.reason);
@@ -487,6 +527,19 @@ export class RequestsService {
         },
         tx,
       );
+      // The reporter and citizens who joined hear about the outcome (never staff names).
+      await this.notifications.notify(tx, {
+        municipalityId: actor.municipalityId,
+        recipients: await this.notifications.citizenWatchers(tx, id),
+        actorId: actor.id,
+        content: citizenStatusChange({
+          requestId: id,
+          publicNumber: current.publicNumber,
+          to: dto.to,
+          reason: dto.to === RequestStatus.REJECTED ? dto.reason : undefined,
+        }),
+        at: now,
+      });
     });
     return this.get(actor, id);
   }
@@ -540,7 +593,14 @@ export class RequestsService {
     dto: ChangeDepartmentDto,
     meta: RequestMeta,
   ): Promise<RequestDetail> {
-    const current = await this.findVisible(actor, id, { status: true, departmentId: true });
+    const current = await this.findVisible(actor, id, {
+      status: true,
+      departmentId: true,
+      publicNumber: true,
+      priority: true,
+      category: { select: { name: true } },
+      neighborhood: { select: { name: true } },
+    });
     this.assertOpen(current.status);
     if (WORK_ORDER_STATUSES.has(current.status)) {
       throw AppException.conflict(
@@ -590,6 +650,24 @@ export class RequestsService {
         },
         tx,
       );
+      await this.notifications.notify(tx, {
+        municipalityId: actor.municipalityId,
+        recipients: await this.notifications.departmentStaff(
+          tx,
+          department.id,
+          Permission.REQUESTS_ASSIGN,
+        ),
+        actorId: actor.id,
+        content: requestAssignedNotification({
+          requestId: id,
+          publicNumber: current.publicNumber,
+          categoryName: current.category?.name ?? 'Talep',
+          neighborhoodName: current.neighborhood?.name ?? null,
+          departmentName: department.name,
+          priority: current.priority,
+        }),
+        at: now,
+      });
     });
     return this.get(actor, id);
   }

@@ -62,6 +62,12 @@ export const envSchema = z.object({
   AI_API_KEY: z.string().optional(),
   AI_MODEL: z.string().min(1).default('claude-opus-5'),
   AI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60000).default(15000),
+
+  /**
+   * SLA alert sweep (in-app "SLA riskte / aşıldı" notifications) every N ms; 0 disables
+   * it. Off by default under NODE_ENV=test (tests call the sweep directly).
+   */
+  SLA_ALERT_INTERVAL_MS: z.coerce.number().int().min(0).max(86_400_000).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

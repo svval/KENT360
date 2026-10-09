@@ -37,6 +37,8 @@ export function configureApp(app: INestApplication): void {
     origin: config.get('CORS_ORIGINS', { infer: true }),
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+    // CSV exports: the web app reads the server's file name.
+    exposedHeaders: ['Content-Disposition'],
   });
 
   app.useGlobalPipes(

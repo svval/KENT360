@@ -140,9 +140,13 @@ enum NotificationType {
   REQUEST_CREATED
   REQUEST_CRITICAL
   REQUEST_STATUS_CHANGED
+  REQUEST_ASSIGNED
+  REQUEST_VERIFIED
+  REQUEST_UPDATED
   WORK_ORDER_CREATED
   WORK_ORDER_ASSIGNED
   WORK_ORDER_COMPLETED
+  WORK_ORDER_RETURNED
   SLA_AT_RISK
   SLA_BREACHED
   SYSTEM
@@ -760,6 +764,8 @@ model Notification {
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, readAt, createdAt])
+  /// SLA alert idempotency ("already notified for this request and type?").
+  @@index([entityId, type])
   @@map("notifications")
 }
 
